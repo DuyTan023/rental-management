@@ -23,13 +23,12 @@ export default function ForgotPassword() {
     confirmPassword: "",
   });
 
-  const newInfor = {
-    email: "",
-    password: "",
-    confirmPassword: "",
-  };
-
   const nextStep = () => {
+    const newInfor = {
+      email: "",
+      password: "",
+      confirmPassword: "",
+    };
     if (step === 1) {
       if (!email) newInfor.email = "Vui lòng nhập email!";
     }
@@ -52,8 +51,13 @@ export default function ForgotPassword() {
     }
   };
 
-  const handleChangePassword = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleChangePassword = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
+    const newInfor = {
+      email: "",
+      password: "",
+      confirmPassword: "",
+    };
     if (step === 3) {
       if (!password) newInfor.password = "Vui lòng nhập Mật mới";
       if (!confirmPassword)
