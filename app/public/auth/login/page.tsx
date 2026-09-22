@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react"; // Import icon con mắt
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import React, { useState } from "react";
 
@@ -19,7 +20,7 @@ export default function Login() {
 
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const newInfor = {
       email: "",
@@ -27,14 +28,29 @@ export default function Login() {
     };
 
     if (!email) newInfor.email = "Vui lòng nhập email!";
-    if (!password) newInfor.password = "VUi lòng nhập mật khẩu!";
+    if (!password) newInfor.password = "Vui lòng nhập mật khẩu!";
 
     setError(newInfor);
 
-    if (email === "test@gmail.com" && password === "123456")
-      setLoginError(false);
-    else setLoginError(true);
+    if (newInfor.email || newInfor.password) {
+      return;
+    }
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setLoginError(true);
+      return;
+    }
+
+    setLoginError(false);
+    window.location.href = "/public/test/auth";
   };
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-white">
       {/* Hình tròn background */}
