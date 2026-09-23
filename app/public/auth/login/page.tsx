@@ -6,49 +6,70 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react"; // Import icon con mắt
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import React, { useState } from "react";
+import { useState } from "react";
 
 export default function Login() {
+  // Kiểm tra lỗi khong nhập email hoặc password
   const [errors, setError] = useState({
     email: "",
     password: "",
   });
 
+  // Bắt lỗi đăng nhập
   const [loginError, setLoginError] = useState<boolean>(false);
+
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
 
+  // Tràn thí hiện / ẩn password
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
+  const [loading, setLoading] = useState(false);
+
+  // Hàm xử lý đăng nhập
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     const newInfor = {
       email: "",
       password: "",
     };
 
+    // Inout email và password rỗng
     if (!email) newInfor.email = "Vui lòng nhập email!";
-    if (!password) newInfor.password = "Vui lòng nhập mật khẩu!";
+    if (!password) newInfor.password = "Vui lòng nhập password!";
 
     setError(newInfor);
 
+    // Nếu 1 trong 2 rỗng hoăc cả 2 rỗng thì return về dừng hàm
     if (newInfor.email || newInfor.password) {
       return;
     }
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      setLoading(true);
 
-    if (result?.error) {
-      setLoginError(true);
-      return;
+      // gọi hàm đăng nhập với phương thức email - password
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      // Nếu có lỗi đăng nhập gán lỗi  = true trả về dừng hàm
+      if (result?.error) {
+        setLoginError(true);
+        return;
+      }
+
+      setLoginError(false);
+
+      window.location.href = "/public/auth/redirect";
+    } catch (error) {
+      console.log("Login error: ", error);
+    } finally {
+      setLoading(false);
     }
-
-    setLoginError(false);
-    window.location.href = "/public/test/auth";
   };
 
   return (
@@ -136,12 +157,20 @@ export default function Login() {
               </Link>
             </div>
 
-            {/* Butto đăng nhập */}
+            {/* Button đăng nhập */}
             <Button
               type="submit"
-              className="w-full bg-blue-500 hover:bg-blue-600 text-lg"
+              disabled={loading}
+              className="w-full bg-blue-500 text-lg hover:bg-blue-600"
             >
-              Đăng nhập
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Đang đăng nhập...
+                </span>
+              ) : (
+                "Đăng nhập"
+              )}
             </Button>
           </form>
 

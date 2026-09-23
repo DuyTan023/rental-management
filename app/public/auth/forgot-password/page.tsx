@@ -35,25 +35,6 @@ export default function ForgotPassword() {
 
   const [loading, setLoading] = useState(false);
 
-  // const nextStep = () => {
-  //   const newInfor = {
-  //     email: "",
-  //     otp: "",
-  //     password: "",
-  //     confirmPassword: "",
-  //   };
-  //   if (step === 1) {
-  //     if (!email) {
-  //       newInfor.email = "Vui lòng nhập email!";
-  //       setError(newInfor);
-  //       return;
-  //     }
-  //   }
-
-  //   setError(newInfor);
-  //   setStep(step + 1);
-  // };
-
   const nextStep = async () => {
     const newInfor = {
       email: "",
@@ -117,28 +98,6 @@ export default function ForgotPassword() {
     }
   };
 
-  // const handleCheckOtp = () => {
-  //   const newInfor = {
-  //     email: "",
-  //     otp: "",
-  //     password: "",
-  //     confirmPassword: "",
-  //   };
-
-  //   if (step === 2) {
-  //     const otpValue = otp.join("");
-
-  //     if (otpValue.length !== 6) {
-  //       newInfor.otp = "Vui lòng nhập đầy đủ 6 số OTP!";
-  //       setError(newInfor);
-  //       return;
-  //     }
-  //   }
-
-  //   setError(newInfor);
-  //   setStep(step + 1);
-  // };
-
   const handleCheckOtp = async () => {
     const newInfor = {
       email: "",
@@ -199,21 +158,7 @@ export default function ForgotPassword() {
       setLoading(false);
     }
   };
-  // const handleChangePassword = (e: React.MouseEvent<HTMLButtonElement>) => {
-  //   e.preventDefault();
-  //   const newInfor = {
-  //     email: "",
-  //     otp: "",
-  //     password: "",
-  //     confirmPassword: "",
-  //   };
-  //   if (step === 3) {
-  //     if (!password) newInfor.password = "Vui lòng nhập Mật mới";
-  //     if (!confirmPassword)
-  //       newInfor.confirmPassword = "Vui lòng nhập lại Mật khẩu mới";
-  //   }
-  //   setError(newInfor);
-  // };
+
   const handleChangePassword = async () => {
     const newInfor = {
       email: "",
