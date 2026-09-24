@@ -22,9 +22,8 @@ export async function POST(req: Request) {
       where: { email },
     });
 
-    /*
-     * Không nói cho client biết email có tồn tại hay không.
-     */
+    // Không nói cho client biết email có tồn tại hay không.
+
     if (!user) {
       return NextResponse.json({
         success: true,

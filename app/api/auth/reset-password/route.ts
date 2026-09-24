@@ -20,9 +20,8 @@ export async function POST(req: Request) {
       );
     }
 
-    /*
-     * Kiểm tra password ở SERVER.
-     */
+    //  Kiểm tra password ở SERVER.
+
     const isValidPassword =
       password.length >= 8 &&
       /[A-Z]/.test(password) &&
@@ -55,9 +54,8 @@ export async function POST(req: Request) {
       );
     }
 
-    /*
-     * Kiểm tra mục đích của token.
-     */
+    // Kiểm tra mục đích của token.
+
     if (
       payload.purpose !== "password-reset" ||
       typeof payload.userId !== "string"
@@ -72,9 +70,8 @@ export async function POST(req: Request) {
 
     const userId = BigInt(payload.userId);
 
-    /*
-     * Tìm user.
-     */
+    // Tìm user.
+
     const user = await prisma.users.findUnique({
       where: {
         id: userId,
@@ -90,14 +87,12 @@ export async function POST(req: Request) {
       );
     }
 
-    /*
-     * Hash password mới.
-     */
+    // Hash password mới.
+
     const passwordHash = await bcrypt.hash(password, 12);
 
-    /*
-     * Cập nhật password.
-     */
+    // Cập nhật password.
+
     await prisma.users.update({
       where: {
         id: userId,
@@ -108,10 +103,9 @@ export async function POST(req: Request) {
       },
     });
 
-    /*
-     * Vô hiệu hóa tất cả OTP reset
-     * của user sau khi đổi password.
-     */
+    //  Vô hiệu hóa tất cả OTP reset
+    //  của user sau khi đổi password.
+
     await prisma.password_reset_otps.updateMany({
       where: {
         user_id: userId,
