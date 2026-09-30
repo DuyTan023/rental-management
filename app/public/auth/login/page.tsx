@@ -75,13 +75,13 @@ export default function Login() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-white">
       {/* Hình tròn background */}
-      <div className="absolute -left-[180px] -top-[220px] h-[650px] w-[650px] rounded-full bg-blue-500" />
+      {/* <div className="absolute -left-[180px] -top-[220px] h-[650px] w-[650px] rounded-full bg-blue-500" />
       <div className="absolute -bottom-[180px] -left-[150px] h-[410px] w-[410px] rounded-full bg-blue-500" />
-      <div className="absolute -bottom-[300px] -right-[180px] h-[710px] w-[710px] rounded-full bg-blue-500" />
+      <div className="absolute -bottom-[300px] -right-[180px] h-[710px] w-[710px] rounded-full bg-blue-500" /> */}
 
       {/* Form đăng nhập */}
-      <div className="relative z-10 flex min-h-screen items-center justify-center">
-        <div className="w-full max-w-md rounded-2xl bg-white p-10 shadow-xl border- border-blue-300">
+      <div className="relative z-10 b flex min-h-screen items-start justify-center px-4 pt-12 sm:items-center sm:pt-0 sm:px-0">
+        <div className="w-full max-w-md rounded-2xl bg-white p-10 shadow-xl border-2 border-blue-200">
           {/* Phần 1: tiều đề */}
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-blue-500">ĐĂNG NHẬP</h1>
@@ -180,6 +180,18 @@ export default function Login() {
               Mật khẩu hoặc tài khoản không đúng!
             </p>
           )}
+
+          <div className="mt-8 flex flex-col items-center justify-center opacity-85  transition-all">
+            {/* Bạn có thể thay src bằng file ảnh SVG/PNG minh họa làng quê trong thư mục public */}
+            <img
+              src="/xom-cu.jpg"
+              alt="Xóm cũ minh họa"
+              className="w-full h-36 sm:h-44 object-cover rounded-xl drop-shadow-sm"
+            />
+            <p className="mt-2 text-xs italic text-gray-400">
+              Nơi góc phố xưa, tình làng nghĩa xóm
+            </p>
+          </div>
         </div>
       </div>
     </main>
