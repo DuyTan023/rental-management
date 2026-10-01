@@ -1,7 +1,6 @@
 import { auth } from "@/auth";
 import RevenueChart from "@/lib/components/landlord/dashboard/RevenueChart";
 import RoomStatusChart from "@/lib/components/landlord/dashboard/RoomStatusChart";
-import Header from "@/lib/components/public/Header";
 import { CardSim, Clock, Home, Houses, UsersRound, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 
@@ -57,7 +56,6 @@ export default async function Landloard() {
   ];
   return (
     <div className="w-full">
-      <Header />
       <div className="flex flex-col p-3 sm:p-4 md:p-5 gap-y-4">
         <div className="flex flex-col">
           <h1 className="text-black text-lg md:text-xl font-bold">
