@@ -2,6 +2,7 @@
 
 import { Bell, LogOut, PanelLeftOpen, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 
 export default function Header() {
   const { data: session, status } = useSession();
@@ -26,6 +27,21 @@ export default function Header() {
     });
   };
 
+  const pathname = usePathname();
+
+  const menuItems = [
+    { name: "Dashboard", href: "/landlord/dashboard" },
+    { name: "Người dùng", href: "/admin/users" },
+    { name: "Phòng trọ", href: "/landlord/rooms" },
+    { name: "Hợp đồng", href: "/admin/contracts" },
+    { name: "Hóa đơn", href: "/admin/invoices" },
+  ];
+
+  const currentMenu = menuItems.find(
+    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+  );
+
+  const pageTitle = currentMenu?.name ?? "Dashboard";
   return (
     <div className="bg-white h-16 flex items-center justify-between border-b px-3 sm:px-4 md:px-5">
       <div className="flex items-center gap-2">
@@ -43,7 +59,7 @@ export default function Header() {
         {/* Tiêu đề */}
         <div className="flex items-start flex-col whitespace-nowrap justify-center leading-tight">
           <p className="text-blue-600 text-lg md:text-xl font-bold">
-            Dashboard
+            {pageTitle}
           </p>
 
           <p className="text-gray-500 text-[10px] sm:text-xs">
