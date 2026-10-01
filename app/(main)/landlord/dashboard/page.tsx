@@ -1,21 +1,8 @@
-import { auth } from "@/auth";
 import RevenueChart from "@/lib/components/landlord/dashboard/RevenueChart";
 import RoomStatusChart from "@/lib/components/landlord/dashboard/RoomStatusChart";
 import { CardSim, Clock, Home, Houses, UsersRound, Wallet } from "lucide-react";
-import { redirect } from "next/navigation";
 
 export default async function Landloard() {
-  const session = await auth();
-
-  // Chưa đăng nhập
-  if (!session) {
-    redirect("/public/auth/login");
-  }
-
-  // Đã đăng nhập nhưng không phải LANDLORD
-  if (session.user.role !== "LANDLORD") {
-    redirect("/"); // hoặc trang 403
-  }
   const overviewCards = [
     {
       icon: Houses,

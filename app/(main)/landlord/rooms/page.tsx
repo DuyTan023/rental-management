@@ -1,8 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardSim, Clock, House, UsersRound, Wallet } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 export default function Rooms() {
@@ -78,13 +79,19 @@ export default function Rooms() {
           <h1 className="text-black text-lg md:text-xl font-bold">
             Xin Chào, Kẻ thống trị
           </h1>
-          <Button className="bg-blue-600 text-white font-bold hover:bg-blue-500">
-            + Thêm phòng
-          </Button>
+          <Link href="/landlord/rooms/create">
+            <Button className="bg-blue-600 text-white font-bold hover:bg-blue-500">
+              + Thêm phòng
+            </Button>
+          </Link>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-2 md:grid-cols-5 gap-6 h-auto bg-transparent p-0">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full flex flex-col gap-y-3"
+        >
+          <TabsList className="w-full h-auto grid grid-cols-2 md:grid-cols-5 gap-4 bg-transparent p-0">
             {itemTabs.map((item) => {
               const Icon = item.icon;
               return (
@@ -119,6 +126,12 @@ export default function Rooms() {
               );
             })}
           </TabsList>
+
+          {itemTabs.map((item) => (
+            <TabsContent value={item.id} key={item.id} className="w-full mt-4">
+              {item.title}
+            </TabsContent>
+          ))}
         </Tabs>
       </div>
     </div>
