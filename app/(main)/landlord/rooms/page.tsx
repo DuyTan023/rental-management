@@ -89,9 +89,9 @@ export default function Rooms() {
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="w-full flex flex-col gap-y-3"
+          className="flex w-full flex-col gap-4"
         >
-          <TabsList className="w-full h-auto grid grid-cols-2 md:grid-cols-5 gap-4 bg-transparent p-0">
+          <TabsList className="grid h-auto w-full grid-cols-2 items-stretch gap-2 bg-transparent p-0 md:grid-cols-5">
             {itemTabs.map((item) => {
               const Icon = item.icon;
               return (
@@ -128,8 +128,12 @@ export default function Rooms() {
           </TabsList>
 
           {itemTabs.map((item) => (
-            <TabsContent value={item.id} key={item.id} className="w-full mt-4">
-              {item.title}
+            <TabsContent
+              value={item.id}
+              key={item.id}
+              className="relative mt-36 md:mt-4 w-full min-w-0"
+            >
+              <div className="rounded-xl border bg-white p-4">{item.title}</div>
             </TabsContent>
           ))}
         </Tabs>

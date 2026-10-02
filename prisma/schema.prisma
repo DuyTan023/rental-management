@@ -31,6 +31,38 @@ model users {
   created_at          DateTime              @default(now()) @db.Timestamptz(6)
   updated_at          DateTime              @default(now()) @db.Timestamptz(6)
   password_reset_otps password_reset_otps[]
+  profiles            profiles?
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model profiles {
+  id              BigInt    @id @default(autoincrement())
+  user_id         BigInt?   @unique
+  full_name       String    @db.VarChar(255)
+  phone           String    @db.VarChar(20)
+  identity_number String?   @unique @db.VarChar(50)
+  date_of_birth   DateTime? @db.Date
+  province_code   String?   @db.VarChar(20)
+  ward_code       String?   @db.VarChar(20)
+  address_detail  String?
+  avatar_url      String?
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+  users           users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model rooms {
+  id            BigInt      @id @default(autoincrement())
+  room_number   String      @unique @db.VarChar(20)
+  area          Decimal     @db.Decimal(10, 2)
+  max_occupants Int
+  listed_rent   Decimal     @db.Decimal(15, 2)
+  status        room_status @default(AVAILABLE)
+  description   String?
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime    @default(now()) @db.Timestamptz(6)
 }
 
 enum account_role {
@@ -42,4 +74,11 @@ enum account_status {
   ACTIVE
   INACTIVE
   LOCKED
+}
+
+enum room_status {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  INACTIVE
 }
