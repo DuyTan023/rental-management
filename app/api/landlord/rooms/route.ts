@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     );
   } catch (err) {
     console.error("GET /api/landlord/rooms ERROR:", err);
-    return serverErrorResponse;
+    return serverErrorResponse();
   }
 }
 
@@ -67,6 +67,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return serverErrorResponse;
+    return serverErrorResponse();
   }
 }
