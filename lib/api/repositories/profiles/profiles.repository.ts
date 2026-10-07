@@ -91,7 +91,7 @@ export const profileRepository = {
       const profile = await tx.profiles.create({
         data: {
           ...inputProfile,
-          user: {
+          users: {
             connect: {
               id: user.id,
             },
