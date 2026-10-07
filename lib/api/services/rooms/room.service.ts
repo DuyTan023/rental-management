@@ -1,6 +1,6 @@
 import { Prisma, rooms } from "@/generated/prisma/client";
 import type { PaginationResult } from "@/lib/types/api.type";
-import { roomRepository } from "../../repositories/rooms/rooms.reponsitory";
+import { roomRepository } from "../../repositories/rooms/rooms.repository";
 
 type GetRoomParams = {
   page?: number;

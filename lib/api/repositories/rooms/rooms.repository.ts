@@ -1,6 +1,6 @@
 import type { Prisma, rooms } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { FindManyParams } from "./../../../types/api.type";
+import { FindManyParams } from "../../../types/api.type";
 type FindManyResultRooms = {
   rooms: rooms[];
   total: number;
