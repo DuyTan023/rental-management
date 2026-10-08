@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { FindManyParams } from "@/lib/types/api.type";
 
 type FindManyResultProfile = {
-  profile: profiles[];
+  profiles: profiles[];
   total: number;
 };
 
@@ -44,19 +44,22 @@ export const profileRepository = {
         }
       : {};
 
-    const [profile, total] = await prisma.$transaction([
+    const [profiles, total] = await prisma.$transaction([
       prisma.profiles.findMany({
         where,
         skip,
         take: limit,
         orderBy: { id: "asc" },
+        include: {
+          users: true,
+        },
       }),
       prisma.profiles.count({
         where,
       }),
     ]);
 
-    return { profile, total };
+    return { profiles, total };
   },
 
   // Tìm người dùng theo id

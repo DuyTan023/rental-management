@@ -39,7 +39,11 @@ export const roomService = {
       // Lỗi không tìm thấy
       if (!room) throw new Error("ROOM_NOT_FOUND");
       return room;
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === "ROOM_NOT_FOUND") {
+        throw error;
+      }
+
       throw new Error("SERVER_ERROR");
     }
   },
@@ -51,7 +55,10 @@ export const roomService = {
       // lỗi không tìm thấy
       if (!room) throw new Error("ROOM_NOT_FOUND");
       return room;
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === "ROOM_NOT_FOUND") {
+        throw error;
+      }
       throw new Error("SERVER_ERROR");
     }
   },

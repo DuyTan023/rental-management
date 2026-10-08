@@ -1,5 +1,5 @@
-import type { rooms } from "@/generated/prisma/client";
-import { roomService } from "@/lib/api/services/rooms/room.service";
+import type { profiles } from "@/generated/prisma/client";
+import { profileService } from "@/lib/api/services/profiles/profile.service";
 import type { ApiResponse, routeContext } from "@/lib/types/api.type";
 import { serverErrorResponse } from "@/lib/utils/api-error";
 import { invalidIdResponse, parseId } from "@/lib/utils/function";
@@ -9,62 +9,62 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function GET(req: NextRequest, { params }: routeContext) {
   try {
     const { id } = await params;
-    const roomId = parseId(id);
+    const profileId = parseId(id);
 
-    if (roomId === null) {
+    if (profileId === null) {
       return invalidIdResponse();
     }
-    const room = await roomService.getRooomById(roomId);
-    return NextResponse.json<ApiResponse<rooms>>(
+    const profile = await profileService.getById(profileId);
+
+    return NextResponse.json<ApiResponse<profiles>>(
       {
         success: true,
-        message: "Lấy phòng trọ thành công",
-        data: serializeBigInt(room),
+        message: "Lấy người thuê thành công",
+        data: serializeBigInt(profile),
       },
       { status: 200 },
     );
   } catch (err) {
-    if (err instanceof Error && err.message === "ROOM_NOT_FOUND") {
+    if (err instanceof Error && err.message === "PROFILE_NOT_FOUND") {
       return NextResponse.json<ApiResponse<null>>(
         {
           success: false,
-          message: "Không tìm thấy phòng trọ!",
+          message: "Không tìm thấy thông tin người thuê!",
           data: null,
         },
         { status: 404 },
       );
     }
-
+    console.error("GET PROFILE ERROR:", err);
     return serverErrorResponse();
   }
 }
-
 export async function PUT(req: NextRequest, { params }: routeContext) {
   try {
     const { id } = await params;
-    const roomId = parseId(id);
+    const profileId = parseId(id);
 
-    if (roomId === null) {
+    if (profileId === null) {
       return invalidIdResponse();
     }
 
     const body = await req.json();
-    const room = await roomService.updateRoom(roomId, body);
+    const profile = await profileService.updateProfile(profileId, body);
 
-    return NextResponse.json<ApiResponse<typeof room>>(
+    return NextResponse.json<ApiResponse<typeof profile>>(
       {
         success: true,
-        message: "Cập nhật thông tin phòng trọ thành công!",
-        data: serializeBigInt(room),
+        message: "Cập nhật thông tin người thuê thành công!",
+        data: serializeBigInt(profile),
       },
       { status: 200 },
     );
   } catch (err) {
-    if (err instanceof Error && err.message === "ROOM_NOT_FOUND") {
+    if (err instanceof Error && err.message === "PROFILE_NOT_FOUND") {
       return NextResponse.json<ApiResponse<null>>(
         {
           success: false,
-          message: "Không tìm thấy phòng trọ!",
+          message: "Không tìm thấy người thuê!",
           data: null,
         },
         { status: 404 },
@@ -78,29 +78,29 @@ export async function PUT(req: NextRequest, { params }: routeContext) {
 export async function DELETE(req: NextRequest, { params }: routeContext) {
   try {
     const { id } = await params;
-    const roomId = parseId(id);
+    const profileId = parseId(id);
 
-    if (roomId === null) {
+    if (profileId === null) {
       return invalidIdResponse();
     }
-    await roomService.deleteRoom(roomId);
+    await profileService.deleteProfile(profileId);
 
     return NextResponse.json<ApiResponse<null>>({
       success: true,
-      message: "Xóa phòng thuê thành công!",
+      message: "Xóa người thuê thành công!",
       data: null,
     });
   } catch (err) {
-    if (err instanceof Error && err.message === "ROOM_NOT_FOUND") {
+    if (err instanceof Error && err.message === "PROFILE_NOT_FOUND") {
       return NextResponse.json<ApiResponse<null>>(
         {
           success: false,
-          message: "Không tìm thấy phòng trọ!",
+          message: "Không tìm thấy người thuê!",
           data: null,
         },
         { status: 404 },
       );
-    } else if (err instanceof Error && err.message === "ROOM_IN_USE") {
+    } else if (err instanceof Error && err.message === "PROFILE_IN_USE") {
       return NextResponse.json<ApiResponse<null>>(
         {
           success: false,
