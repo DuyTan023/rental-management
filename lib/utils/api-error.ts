@@ -14,3 +14,14 @@ export function serverErrorResponse() {
     },
   );
 }
+
+export function badRequestResponse(message: string = "Dữ liệu không hợp lệ") {
+  return NextResponse.json<ApiResponse<null>>(
+    {
+      success: false,
+      message,
+      data: null,
+    },
+    { status: 400 },
+  );
+}
