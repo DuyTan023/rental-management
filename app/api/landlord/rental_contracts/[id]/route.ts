@@ -103,7 +103,7 @@ export async function DELETE(req: NextRequest, { params }: routeContext) {
 
     return NextResponse.json<ApiResponse<null>>({
       success: true,
-      message: "Xóa hợp đồng thành công!",
+      message: "Xóa `hợp đồng thành công!",
       data: null,
     });
   } catch (err) {
