@@ -7,14 +7,14 @@ import { badRequestResponse, serverErrorResponse } from "@/lib/utils/api-error";
 import { invalidIdResponse, parseId } from "@/lib/utils/function";
 import { serializeBigInt } from "@/lib/utils/serialize";
 import { NextResponse, type NextRequest } from "next/server";
-type routeContext = {
+export type routeDepoistContext = {
   params: Promise<{
     deposit_id: string;
   }>;
 };
 
 // API khấu trừ tiền cọc
-export async function PUT(req: NextRequest, { params }: routeContext) {
+export async function PUT(req: NextRequest, { params }: routeDepoistContext) {
   try {
     //Lấy danh deposit_id
     const { deposit_id } = await params;
