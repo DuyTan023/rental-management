@@ -1,10 +1,10 @@
-import type { rooms } from "@/generated/prisma/client";
 import { roomService } from "@/lib/api/services/rooms/room.service";
-import type { PaginationResult } from "@/lib/types/api.type";
-import { ApiResponse } from "@/lib/types/api.type";
-import { serverErrorResponse } from "@/lib/utils/api-error";
-import { serializeBigInt } from "@/lib/utils/serialize";
-import { NextRequest, NextResponse } from "next/server";
+import {
+  apiErrorResponse,
+  apiSuccessResponse,
+  serverErrorResponse,
+} from "@/lib/utils/api-error";
+import { NextRequest } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,14 +24,7 @@ export async function GET(req: NextRequest) {
 
     const rooms = await roomService.getRoom({ page, limit, keyword });
 
-    return NextResponse.json<ApiResponse<PaginationResult<rooms>>>(
-      {
-        success: true,
-        message: "Lấy danh sách phòng trọ thành công",
-        data: serializeBigInt(rooms),
-      },
-      { status: 200 },
-    );
+    return apiSuccessResponse("Lấy danh sách phòng trọ thành công", rooms, 200);
   } catch (err) {
     return serverErrorResponse();
   }
@@ -42,28 +35,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const room = await roomService.createRoom(body);
 
-    return NextResponse.json<ApiResponse<typeof room>>(
-      {
-        success: true,
-        message: "Tạo phòng thuê thành công",
-        data: serializeBigInt(room),
-      },
-      {
-        status: 201,
-      },
-    );
+    return apiSuccessResponse("Tạo phòng thuê thành công", room, 201);
   } catch (err) {
     if (err instanceof Error && err.message === "ROOM_EXISTS") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Phòng thuê đã tồn tại!",
-          data: null,
-        },
-        {
-          status: 409,
-        },
-      );
+      return apiErrorResponse("Phòng thuê đã tồn tại!", 409);
     }
 
     return serverErrorResponse();

@@ -1,7 +1,11 @@
 import type { profiles } from "@/generated/prisma/client";
 import { profileService } from "@/lib/api/services/profiles/profile.service";
 import type { ApiResponse, PaginationResult } from "@/lib/types/api.type";
-import { serverErrorResponse } from "@/lib/utils/api-error";
+import {
+  apiErrorResponse,
+  apiSuccessResponse,
+  serverErrorResponse,
+} from "@/lib/utils/api-error";
 import { serializeBigInt } from "@/lib/utils/serialize";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -38,28 +42,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const profile = await profileService.createProfile(body.profile, body.user);
-    return NextResponse.json<ApiResponse<typeof profile>>(
-      {
-        success: true,
-        message: "Tạo mới người thuê thành công",
-        data: serializeBigInt(profile),
-      },
-      {
-        status: 201,
-      },
-    );
+    return apiSuccessResponse("Tạo mới ngời thuê thành công", profile, 201);
   } catch (err) {
     if (err instanceof Error && err.message === "PROFILE_EXISTS") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Người thuê đã tồn tại!",
-          data: null,
-        },
-        {
-          status: 409,
-        },
-      );
+      return apiErrorResponse("Người thuê đã tồn tại", 409);
     }
 
     return serverErrorResponse();

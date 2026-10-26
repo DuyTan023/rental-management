@@ -242,4 +242,25 @@ export const roomServiceService = {
       throw new Error("SERVER_ERROR");
     }
   },
+
+  // Lấy danh sách dịch vụ đang được sử dụng của phòng
+  getActiveByRoomId: async (roomId: bigint): Promise<room_services[]> => {
+    try {
+      const room_services =
+        await roomServiceRepository.findActiveByRoomId(roomId);
+
+      if (room_services.length === 0) {
+        throw new Error("ROOM_SERVICES_NOT_FOUND");
+      }
+      return room_services;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "ROOM_SERVICES_NOT_FOUND"
+      ) {
+        throw error;
+      }
+      throw new Error("SERVER_ERROR");
+    }
+  },
 };

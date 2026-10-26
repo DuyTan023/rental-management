@@ -1,10 +1,14 @@
-import type { rooms } from "@/generated/prisma/client";
+//api/landloard/rooms/[id]/route.ts
+
 import { roomService } from "@/lib/api/services/rooms/room.service";
-import type { ApiResponse, routeContext } from "@/lib/types/api.type";
-import { serverErrorResponse } from "@/lib/utils/api-error";
+import type { routeContext } from "@/lib/types/api.type";
+import {
+  apiErrorResponse,
+  apiSuccessResponse,
+  serverErrorResponse,
+} from "@/lib/utils/api-error";
 import { invalidIdResponse, parseId } from "@/lib/utils/function";
-import { serializeBigInt } from "@/lib/utils/serialize";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 
 export async function GET(req: NextRequest, { params }: routeContext) {
   try {
@@ -15,24 +19,11 @@ export async function GET(req: NextRequest, { params }: routeContext) {
       return invalidIdResponse();
     }
     const room = await roomService.getRooomById(roomId);
-    return NextResponse.json<ApiResponse<rooms>>(
-      {
-        success: true,
-        message: "Lấy phòng trọ thành công",
-        data: serializeBigInt(room),
-      },
-      { status: 200 },
-    );
+
+    return apiSuccessResponse("Lấy phòng trọ thành công", room, 200);
   } catch (err) {
     if (err instanceof Error && err.message === "ROOM_NOT_FOUND") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Không tìm thấy phòng trọ!",
-          data: null,
-        },
-        { status: 404 },
-      );
+      return apiErrorResponse("Không tìm thấy phòng trọ!", 404);
     }
 
     return serverErrorResponse();
@@ -51,24 +42,14 @@ export async function PUT(req: NextRequest, { params }: routeContext) {
     const body = await req.json();
     const room = await roomService.updateRoom(roomId, body);
 
-    return NextResponse.json<ApiResponse<typeof room>>(
-      {
-        success: true,
-        message: "Cập nhật thông tin phòng trọ thành công!",
-        data: serializeBigInt(room),
-      },
-      { status: 200 },
+    return apiSuccessResponse(
+      "Cập nhật thông tin phòng trọ thành công!",
+      room,
+      200,
     );
   } catch (err) {
     if (err instanceof Error && err.message === "ROOM_NOT_FOUND") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Không tìm thấy phòng trọ!",
-          data: null,
-        },
-        { status: 404 },
-      );
+      return apiErrorResponse("Không tìm thấy phòng trọ!", 404);
     }
 
     return serverErrorResponse();
@@ -85,30 +66,12 @@ export async function DELETE(req: NextRequest, { params }: routeContext) {
     }
     await roomService.deleteRoom(roomId);
 
-    return NextResponse.json<ApiResponse<null>>({
-      success: true,
-      message: "Xóa phòng thuê thành công!",
-      data: null,
-    });
+    return apiSuccessResponse("Xóa phòng thuê thành công", null, 200);
   } catch (err) {
     if (err instanceof Error && err.message === "ROOM_NOT_FOUND") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Không tìm thấy phòng trọ!",
-          data: null,
-        },
-        { status: 404 },
-      );
+      return apiErrorResponse("Không tìm thấy phòng trọ", 404);
     } else if (err instanceof Error && err.message === "ROOM_IN_USE") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Không thể xóa vì đang sử dụng!",
-          data: null,
-        },
-        { status: 409 },
-      );
+      return apiErrorResponse("Không thể xóa vì đang sử dụng", 409);
     }
     return serverErrorResponse();
   }

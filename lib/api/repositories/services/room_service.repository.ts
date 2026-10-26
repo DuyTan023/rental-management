@@ -101,11 +101,26 @@ export const roomServiceRepository = {
   // Ngừng áp dụng dịch vụ cho phòng bằng cách cập nhật ngày kết thúc
   stopRoomService: async (
     id: bigint,
-    effective_to: Date,
+    effective_to: Date, // id của cái record (cái id của mẫu null)
   ): Promise<room_services> => {
     return prisma.room_services.update({
       where: { id },
       data: { effective_to },
+    });
+  },
+  //Lấy danh sách các dịch vụ đang được sử dụng của phòng các dịch vụ có ngày hết han là null)
+  findActiveByRoomId: async (roomId: bigint): Promise<room_services[]> => {
+    return prisma.room_services.findMany({
+      where: {
+        room_id: roomId,
+        effective_to: null,
+      },
+      include: {
+        services: true,
+      },
+      orderBy: {
+        effective_from: "desc",
+      },
     });
   },
 };

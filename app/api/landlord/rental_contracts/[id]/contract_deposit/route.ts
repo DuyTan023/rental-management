@@ -1,11 +1,14 @@
-import type { contract_deposits } from "@/generated/prisma/client";
 import type { CreateFullContractDepositParams } from "@/lib/api/repositories/contract_deposits/contract_deposits.repository";
 import { contractDepositService } from "@/lib/api/services/contract_deposits/contract_deposits.service";
-import type { ApiResponse, routeContext } from "@/lib/types/api.type";
-import { badRequestResponse, serverErrorResponse } from "@/lib/utils/api-error";
+import type { routeContext } from "@/lib/types/api.type";
+import {
+  apiErrorResponse,
+  apiSuccessResponse,
+  badRequestResponse,
+  serverErrorResponse,
+} from "@/lib/utils/api-error";
 import { invalidIdResponse, parseId } from "@/lib/utils/function";
-import { serializeBigInt } from "@/lib/utils/serialize";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 
 // lấy khoản cọc của hợp đồng
 // api/rental_contracts/[id]/contract_deposit/route.ts
@@ -22,24 +25,14 @@ export async function GET(req: NextRequest, { params }: routeContext) {
     const contract_deposit =
       await contractDepositService.getByContractId(contract_id);
 
-    return NextResponse.json<ApiResponse<contract_deposits>>(
-      {
-        success: true,
-        message: "Lấy khoản cọc thành công",
-        data: serializeBigInt(contract_deposit),
-      },
-      { status: 200 },
+    return apiSuccessResponse(
+      "Lấy khoản cọc thành công",
+      contract_deposit,
+      200,
     );
   } catch (err) {
     if (err instanceof Error && err.message === "CONTRACT_DEPOSIT_NOT_FOUND") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Không tìm thấy khoản cọc!",
-          data: null,
-        },
-        { status: 404 },
-      );
+      return apiErrorResponse("Không tìm thấy khoản cọc!", 404);
     }
     console.error("GET DEPOSIT CONTRAC ERROR:", err);
     return serverErrorResponse();
@@ -75,28 +68,14 @@ export async function POST(req: NextRequest, { params }: routeContext) {
     const contract_deposit =
       await contractDepositService.createContractDeposit(param);
 
-    return NextResponse.json<ApiResponse<typeof contract_deposit>>(
-      {
-        success: true,
-        message: "Tạo mới khoản cọc thành công",
-        data: serializeBigInt(contract_deposit),
-      },
-      {
-        status: 201,
-      },
+    return apiSuccessResponse(
+      "Tạo mới khoản cọc thành công",
+      contract_deposit,
+      201,
     );
   } catch (error) {
     if (error instanceof Error && error.message === "CONTRACT_DEPOSIT_EXISTS") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Lỗi trùng lặp!",
-          data: null,
-        },
-        {
-          status: 409,
-        },
-      );
+      return apiErrorResponse("Lỗi trùng lặp!", 409);
     }
     console.error("POST CONTRACT DEPOSIT ERROR:", error);
     return serverErrorResponse();

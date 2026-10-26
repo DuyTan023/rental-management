@@ -6,7 +6,12 @@ import type {
 } from "@/lib/api/repositories/rental_contracts/rental_contracts.repository";
 import { rentalContractService } from "@/lib/api/services/rental_contracts/rental_contracts.service";
 import type { ApiResponse, PaginationResult } from "@/lib/types/api.type";
-import { badRequestResponse, serverErrorResponse } from "@/lib/utils/api-error";
+import {
+  apiErrorResponse,
+  apiSuccessResponse,
+  badRequestResponse,
+  serverErrorResponse,
+} from "@/lib/utils/api-error";
 import { serializeBigInt } from "@/lib/utils/serialize";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -70,28 +75,14 @@ export async function POST(req: NextRequest) {
     const rental_contract =
       await rentalContractService.createRentalContract(body);
 
-    return NextResponse.json<ApiResponse<typeof rental_contract>>(
-      {
-        success: true,
-        message: "Tạo mới hợp đồng thành công",
-        data: serializeBigInt(rental_contract),
-      },
-      {
-        status: 201,
-      },
+    return apiSuccessResponse(
+      "Tạo mới hợp đồng thành công",
+      rental_contract,
+      201,
     );
   } catch (error) {
     if (error instanceof Error && error.message === "RENTAL_CONTRACT_EXISTS") {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          success: false,
-          message: "Lỗi trùng lặp tạo hợp đồng!",
-          data: null,
-        },
-        {
-          status: 409,
-        },
-      );
+      return apiErrorResponse("Lỗi trùng lặp tạo hợp đồng", 409);
     }
 
     return serverErrorResponse();
