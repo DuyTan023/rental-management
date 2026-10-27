@@ -2,6 +2,7 @@
 
 import { Bell, LogOut, PanelLeftOpen, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export default function Header() {
@@ -21,10 +22,18 @@ export default function Header() {
 
   const formattedDate = `${weekday}, ${day} tháng ${month}, ${year}`;
 
+  // const handleLogout = async () => {
+  //   await signOut({
+  //     callbackUrl: "/public/auth/login",
+  //   });
+  // };
+
   const handleLogout = async () => {
     await signOut({
-      callbackUrl: "/public/auth/login",
+      redirect: false,
     });
+
+    window.location.href = "/public/auth/login";
   };
 
   const pathname = usePathname();
@@ -33,8 +42,10 @@ export default function Header() {
     { name: "Dashboard", href: "/landlord/dashboard" },
     { name: "Người dùng", href: "/admin/users" },
     { name: "Phòng trọ", href: "/landlord/rooms" },
+    { name: "Dịch vụ", href: "/landlord/services" },
     { name: "Hợp đồng", href: "/admin/contracts" },
     { name: "Hóa đơn", href: "/admin/invoices" },
+    { name: "Profile", href: "/public/user/profile" },
   ];
 
   const currentMenu = menuItems.find(
@@ -80,13 +91,15 @@ export default function Header() {
 
         {/* User */}
         <div className="flex h-7 sm:h-9 border-2 border-blue-600 text-gray-500 rounded-2xl whitespace-nowrap text-sm items-center gap-x-2 px-1 justify-between">
-          <div className="flex items-center justify-center whitespace-nowrap gap-1 hover:bg-gray-200 rounded-xl p-0.5">
-            <p className="hidden sm:block whitespace-nowrap">
-              {status === "loading" ? "Đang tải..." : session?.user?.email}
-            </p>
+          <Link href="/public/user/profile">
+            <div className="flex items-center justify-center whitespace-nowrap gap-1 hover:bg-gray-200 rounded-xl p-0.5">
+              <p className="hidden sm:block whitespace-nowrap">
+                {status === "loading" ? "Đang tải..." : session?.user?.email}
+              </p>
 
-            <User size={20} />
-          </div>
+              <User size={20} />
+            </div>
+          </Link>
 
           {/* Logout */}
           <button
