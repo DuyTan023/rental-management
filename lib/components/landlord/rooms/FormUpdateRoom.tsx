@@ -116,17 +116,6 @@ export function FormUpdateRoom({ room, trigger }: RoomProps) {
         }
       }}
     >
-      {/* <DialogTrigger
-        render={
-          <Button
-            size="sm"
-            className="h-8 border border-blue-500/20 bg-gradient-to-r from-blue-700 to-indigo-700 text-xs font-semibold text-white shadow-md shadow-blue-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-800 hover:to-indigo-800 hover:shadow-lg hover:shadow-blue-900/30"
-          >
-            <Pencil className="mr-1.5 size-3.5" />
-            Cập nhật thông tin phòng
-          </Button>
-        }
-      /> */}
       <DialogTrigger render={trigger} />
 
       <DialogContent className="overflow-hidden border-0 bg-white p-0 shadow-2xl shadow-slate-950/20 sm:max-w-lg">
