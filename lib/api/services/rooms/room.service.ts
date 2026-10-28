@@ -1,6 +1,9 @@
 import { Prisma, rooms } from "@/generated/prisma/client";
 import type { PaginationResult } from "@/lib/types/api.type";
-import { roomRepository } from "../../repositories/rooms/rooms.repository";
+import {
+  roomRepository,
+  RoomWithCurrentContract,
+} from "../../repositories/rooms/rooms.repository";
 
 type GetRoomParams = {
   page?: number;
@@ -13,7 +16,7 @@ export const roomService = {
     page = 1,
     limit = 10,
     keyword,
-  }: GetRoomParams): Promise<PaginationResult<rooms>> => {
+  }: GetRoomParams): Promise<PaginationResult<RoomWithCurrentContract>> => {
     try {
       const { rooms, total } = await roomRepository.findMany({
         page,
@@ -48,7 +51,7 @@ export const roomService = {
     }
   },
 
-  getRooomById: async (id: bigint): Promise<rooms> => {
+  getRooomById: async (id: bigint): Promise<RoomWithCurrentContract> => {
     try {
       const room = await roomRepository.findById(id);
 

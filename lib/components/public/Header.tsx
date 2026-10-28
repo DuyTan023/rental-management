@@ -54,7 +54,7 @@ export default function Header() {
 
   const pageTitle = currentMenu?.name ?? "Dashboard";
   return (
-    <div className="bg-white h-16 flex items-center justify-between border-b px-3 sm:px-4 md:px-5">
+    <div className="bg-white h-16 flex items-center justify-between border-b px-3 sm:px-4 md:px-5 sticky top-0 z-50">
       <div className="flex items-center gap-2">
         {/* Nút mở Sidebar trên mobile */}
         <button
