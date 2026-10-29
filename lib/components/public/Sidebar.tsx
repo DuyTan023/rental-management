@@ -14,7 +14,7 @@ export default function Sidebar() {
     { name: "Người dùng", href: "/admin/users", icon: "👥" },
     { name: "Phòng trọ", href: "/landlord/rooms", icon: "🏠" },
     { name: "Dịch vụ", href: "/landlord/services", icon: "⚙️" },
-    { name: "Hợp đồng", href: "/admin/contracts", icon: "📄" },
+    { name: "Hợp đồng", href: "/landlord/rental_contracts", icon: "📄" },
     { name: "Hóa đơn", href: "/admin/invoices", icon: "💰" },
   ];
 

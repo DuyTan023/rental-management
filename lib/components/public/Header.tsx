@@ -43,7 +43,7 @@ export default function Header() {
     { name: "Người dùng", href: "/admin/users" },
     { name: "Phòng trọ", href: "/landlord/rooms" },
     { name: "Dịch vụ", href: "/landlord/services" },
-    { name: "Hợp đồng", href: "/admin/contracts" },
+    { name: "Hợp đồng", href: "/landlord/rental_contracts" },
     { name: "Hóa đơn", href: "/admin/invoices" },
     { name: "Profile", href: "/public/user/profile" },
   ];
