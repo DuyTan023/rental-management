@@ -42,13 +42,32 @@ export const serviceRepository = {
     });
   },
 
-  // Ngừng cug cấp hoặc kích hoạt
-  isActive: async (id: bigint, is_active: boolean): Promise<services> => {
-    return prisma.services.update({
-      where: { id },
-      data: {
-        is_active: is_active,
-      },
+  // Ngừng cung cấp hoặc kích hoạt dịch vụ
+  isActive: async (
+    id: bigint,
+    is_active: boolean,
+  ): Promise<services> => {
+    return prisma.$transaction(async (tx) => {
+      // Cập nhật trạng thái cung cấp dịch vụ
+      const service = await tx.services.update({
+        where: { id },
+        data: { is_active },
+      });
+
+      // Nếu ngừng cung cấp, ngừng áp dụng tại các phòng đang sử dụng
+      if (!is_active) {
+        await tx.room_services.updateMany({
+          where: {
+            service_id: id,
+            effective_to: null,
+          },
+          data: {
+            effective_to: new Date(),
+          },
+        });
+      }
+
+      return service;
     });
-  },
-};
+  }
+}

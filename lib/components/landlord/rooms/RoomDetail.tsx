@@ -106,15 +106,16 @@ export default function RoomDetail({ room }: RoomDetailProps) {
         {/* HEADER */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <Button
-              variant="outline"
-              size="icon"
-              className="mt-1 shrink-0 bg-white"
-              aria-label="Quay lại"
-              onClick={() => window.history.back()}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <Link href="/landlord/rooms">
+              <Button
+                variant="outline"
+                size="icon"
+                className="mt-1 shrink-0 bg-white"
+                aria-label="Quay lại"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </Link>
 
             <div>
               <div className="flex flex-wrap items-center gap-3">
@@ -418,7 +419,7 @@ export default function RoomDetail({ room }: RoomDetailProps) {
 
                           <div className="text-right">
                             <p className="font-semibold text-slate-800">
-                              {format.currency(service.unit_price)}
+                              {format.currency(service.services.default_unit_price)}
                             </p>
 
                             <p className="mt-1 text-xs text-slate-500">

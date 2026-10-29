@@ -70,13 +70,13 @@ export async function GET(
 
 // Ngừng sử dụng dịch vụ của phòng
 export async function PATCH(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: roomServiceRouteContext,
 ) {
   try {
     const { id, service_id } = await params;
 
-    // Lấy ID phòng và ID bản ghi dịch vụ
+    // Lấy ID phòng và ID dịch vụ
     const roomId = parseId(id);
     const serviceId = parseId(service_id);
 
@@ -84,22 +84,12 @@ export async function PATCH(
       return invalidIdResponse();
     }
 
-    // Lấy ngày kết thúc từ request body
-    const body = await req.json();
-    const { effective_to } = body;
-
-    if (!effective_to) {
-      return apiErrorResponse("Vui lòng cung cấp ngày kết thúc dịch vụ", 400);
-    }
-
-    const effectiveTo = new Date(effective_to);
-
-    if (Number.isNaN(effectiveTo.getTime())) {
-      return apiErrorResponse("Ngày kết thúc không hợp lệ", 400);
-    }
+    // Backend tự lấy ngày hiện tại
+    const effectiveTo = new Date();
 
     // Ngừng dịch vụ
     const result = await roomServiceService.stopRoomService(
+      roomId,
       serviceId,
       effectiveTo,
     );
@@ -110,22 +100,30 @@ export async function PATCH(
       200,
     );
   } catch (error) {
-    if (error instanceof Error && error.message === "ROOM_SERVICE_NOT_FOUND") {
-      return apiErrorResponse("Không tìm thấy dịch vụ phòng", 404);
-    }
+    if (error instanceof Error) {
+      switch (error.message) {
+        case "ROOM_SERVICE_NOT_FOUND":
+          return apiErrorResponse(
+            "Không tìm thấy dịch vụ đang được sử dụng trong phòng",
+            404,
+          );
 
-    if (
-      error instanceof Error &&
-      error.message === "ROOM_SERVICE_ALREADY_STOPPED"
-    ) {
-      return apiErrorResponse("Dịch vụ phòng đã ngừng sử dụng", 400);
-    }
+        case "ROOM_SERVICE_ALREADY_STOPPED":
+          return apiErrorResponse(
+            "Dịch vụ phòng đã ngừng sử dụng",
+            400,
+          );
 
-    if (error instanceof Error && error.message === "INVALID_EFFECTIVE_TO") {
-      return apiErrorResponse(
-        "Ngày kết thúc phải sau ngày bắt đầu áp dụng",
-        400,
-      );
+        case "INVALID_EFFECTIVE_DATE":
+        case "INVALID_EFFECTIVE_TO":
+          return apiErrorResponse(
+            "Ngày kết thúc không được trước ngày bắt đầu sử dụng",
+            400,
+          );
+
+        case "INVALID_DATE":
+          return apiErrorResponse("Ngày kết thúc không hợp lệ", 400);
+      }
     }
 
     return serverErrorResponse();

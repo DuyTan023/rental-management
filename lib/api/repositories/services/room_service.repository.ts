@@ -6,6 +6,12 @@
 import { Prisma, room_services } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 type Tx = Prisma.TransactionClient;
+
+export type RoomServiceWithService = Prisma.room_servicesGetPayload<{
+  include: {
+    services: true;
+  };
+}>;
 export const roomServiceRepository = {
   // Thêm 1 dịch vụ vào phòng
   createRoomService: async (
@@ -99,17 +105,31 @@ export const roomServiceRepository = {
   },
 
   // Ngừng áp dụng dịch vụ cho phòng bằng cách cập nhật ngày kết thúc
+  // Ngừng áp dụng dịch vụ cho phòng bằng cách cập nhật ngày kết thúc
   stopRoomService: async (
-    id: bigint,
-    effective_to: Date, // id của cái record (cái id của mẫu null)
+    room_id: bigint,
+    service_id: bigint,
+    effective_to: Date,
   ): Promise<room_services> => {
+    const room_service = await prisma.room_services.findFirst({
+      where: {
+        room_id,
+        service_id,
+        effective_to: null,
+      },
+    });
+
     return prisma.room_services.update({
-      where: { id },
-      data: { effective_to },
+      where: {
+        id: room_service!.id,
+      },
+      data: {
+        effective_to,
+      },
     });
   },
   //Lấy danh sách các dịch vụ đang được sử dụng của phòng các dịch vụ có ngày hết han là null)
-  findActiveByRoomId: async (roomId: bigint): Promise<room_services[]> => {
+  findActiveByRoomId: async (roomId: bigint): Promise<RoomServiceWithService[]> => {
     return prisma.room_services.findMany({
       where: {
         room_id: roomId,
@@ -123,4 +143,28 @@ export const roomServiceRepository = {
       },
     });
   },
+
+  // Lấy toàn bộ lịch sử dịch vụ của phòng
+  findRoomServiceHistory: async (
+    roomId: bigint,
+  ): Promise<RoomServiceWithService[]> => {
+    return prisma.room_services.findMany({
+      where: {
+        room_id: roomId,
+      },
+      include: {
+        services: true,
+      },
+      orderBy: [
+        {
+          effective_from: "desc",
+        },
+        {
+          id: "desc",
+        },
+      ],
+    });
+  },
 };
+
+

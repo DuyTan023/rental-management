@@ -1,6 +1,6 @@
 import { Prisma, room_services } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { roomServiceRepository } from "../../repositories/services/room_service.repository";
+import { roomServiceRepository, RoomServiceWithService } from "../../repositories/services/room_service.repository";
 
 export const roomServiceService = {
   // Chẩn hóa ngày về Date theo UTC
@@ -18,18 +18,8 @@ export const roomServiceService = {
     input: Prisma.room_servicesCreateInput,
   ): Promise<room_services> => {
     try {
-      // Kiểm tra giá mặc định là số và lớn hơn 0
-      const price = Number(input.unit_price);
-      if (!Number.isFinite(price) || price < 0) {
-        throw new Error("INVALID_UNIT_PRICE");
-      }
       return await roomServiceRepository.createRoomService(input);
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === "INVALID_UNIT_PRICE") {
-          throw error;
-        }
-      }
 
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2002") {
@@ -43,7 +33,16 @@ export const roomServiceService = {
       throw new Error("SERVER_ERROR");
     }
   },
-
+// createRoomService: async (
+//   input: Prisma.room_servicesCreateInput,
+// ): Promise<room_services> => {
+//   try {
+//     return await roomServiceRepository.createRoomService(input);
+//   } catch (error) {
+//     console.error("Lỗi createRoomService:", error);
+//     throw error;
+//   }
+// },
   // Lấy dịch vụ và giá của phòng theo ngày áp dụng các trường hợp tiềm kiếm lập hóa đơn bổ sung
   getRoomServiceByDate: async (
     room_id: bigint,
@@ -192,59 +191,56 @@ export const roomServiceService = {
 
   // Ngừng áp dụng dịch vụ cho phòng
   stopRoomService: async (
-    id: bigint,
+    room_id: bigint,
+    service_id: bigint,
     effective_to: Date,
   ): Promise<room_services> => {
     try {
-      //Chuẩn hóa ngày kết thúc hiện tại
+      // Chuẩn hóa ngày kết thúc
       const newEnd = roomServiceService.normalizeDate(effective_to);
 
-      const room_service = await roomServiceRepository.findById(id);
+      // Tìm bản ghi dịch vụ đang hoạt động và cập nhật ngày kết thúc
+      const room_service = await roomServiceRepository.stopRoomService(
+        room_id,
+        service_id,
+        newEnd,
+      );
 
       if (!room_service) {
         throw new Error("ROOM_SERVICE_NOT_FOUND");
       }
 
-      // này bắt đầu record hiện tại cần dừng
+      // Chuẩn hóa ngày bắt đầu để kiểm tra ngày kết thúc
       const startDate = roomServiceService.normalizeDate(
         room_service.effective_from,
       );
 
-      // Ngày hết hạn phải sau ngày kết thúc
-      if (newEnd <= startDate) {
+      // Ngày kết thúc phải sau ngày bắt đầu
+      if (newEnd < startDate) {
         throw new Error("INVALID_EFFECTIVE_DATE");
       }
 
-      // Ngày hết hạn hiện tại phải null thì mới gán dừng được
-      if (room_service.effective_to !== null) {
-        throw new Error("ROOM_SERVICE_ALREADY_STOPPED");
-      }
-
-      return await roomServiceRepository.stopRoomService(
-        room_service.id,
-        newEnd,
-      );
+      return room_service;
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message === "INVALID_DATE") {
-          throw error;
-        }
-        if (error.message === "ROOM_SERVICE_NOT_FOUND") {
-          throw error;
-        }
-        if (error.message === "INVALID_EFFECTIVE_DATE") {
-          throw error;
-        }
-        if (error.message === "ROOM_SERVICE_ALREADY_STOPPED") {
+        const knownErrors = [
+          "INVALID_DATE",
+          "ROOM_SERVICE_NOT_FOUND",
+          "INVALID_EFFECTIVE_DATE",
+          "ROOM_SERVICE_ALREADY_STOPPED",
+        ];
+
+        if (knownErrors.includes(error.message)) {
           throw error;
         }
       }
+
       throw new Error("SERVER_ERROR");
     }
   },
 
   // Lấy danh sách dịch vụ đang được sử dụng của phòng
-  getActiveByRoomId: async (roomId: bigint): Promise<room_services[]> => {
+  getActiveByRoomId: async (roomId: bigint): Promise<RoomServiceWithService[]> => {
     try {
       const room_services =
         await roomServiceRepository.findActiveByRoomId(roomId);
@@ -260,6 +256,18 @@ export const roomServiceService = {
       ) {
         throw error;
       }
+      throw new Error("SERVER_ERROR");
+    }
+  },
+
+  // Lấy danh sách dịch vụ đang được sử dụng của phòng
+  getRoomServiceHistory: async (roomId: bigint): Promise<RoomServiceWithService[]> => {
+    try {
+      const room_services =
+        await roomServiceRepository.findRoomServiceHistory(roomId);
+
+      return room_services;
+    } catch (error) {
       throw new Error("SERVER_ERROR");
     }
   },

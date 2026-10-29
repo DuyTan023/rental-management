@@ -23,16 +23,16 @@ export async function POST(req: NextRequest, { params }: routeContext) {
     }
 
     const body = await req.json();
+
     const service_id = parseId(body.service_id);
 
-    if (service_id === undefined) {
+
+    if (service_id === null) {
       return invalidIdResponse();
     }
     const param: Prisma.room_servicesCreateInput = {
-      ...body,
       rooms: { connect: { id: room_id } },
       services: { connect: { id: service_id } },
-      unit_price: body.unit_price,
       effective_from: new Date(),
       effective_to: null,
     };
