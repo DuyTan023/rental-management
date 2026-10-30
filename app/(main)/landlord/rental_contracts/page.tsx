@@ -1,12 +1,11 @@
-
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { RentalContractWithDetails } from "@/lib/api/repositories/rental_contracts/rental_contracts.repository";
 import { ContractFilters } from "@/lib/components/landlord/rental_contracts/ContractFilters";
 import { ContractList } from "@/lib/components/landlord/rental_contracts/ContractList";
-import { RentalContractWithDetails } from "@/lib/api/repositories/rental_contracts/rental_contracts.repository";
-
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 
 export default function RentalContractPage() {
   const [contracts, setContracts] = useState<RentalContractWithDetails[]>([]);
@@ -39,15 +38,13 @@ export default function RentalContractPage() {
         {
           method: "GET",
           cache: "no-store",
-        }
+        },
       );
 
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Không thể lấy danh sách hợp đồng"
-        );
+        throw new Error(result.message || "Không thể lấy danh sách hợp đồng");
       }
 
       const contractData = result.data?.data;
@@ -69,7 +66,7 @@ export default function RentalContractPage() {
       setError(
         error instanceof Error
           ? error.message
-          : "Đã xảy ra lỗi khi lấy danh sách hợp đồng"
+          : "Đã xảy ra lỗi khi lấy danh sách hợp đồng",
       );
     } finally {
       setLoading(false);
@@ -86,20 +83,17 @@ export default function RentalContractPage() {
         <h1 className="text-lg font-bold text-black md:text-xl">
           Trang quản lý hợp đồng
         </h1>
-
-        <Button className="bg-blue-600 font-bold text-white hover:bg-blue-500">
-          + Tạo hợp đồng
-        </Button>
+        <Link href="/landlord/rental_contracts/create">
+          <Button className="bg-blue-600 font-bold text-white hover:bg-blue-500">
+            + Tạo hợp đồng
+          </Button>
+        </Link>
       </div>
 
       <div className="flex flex-col gap-y-3">
         <ContractFilters />
 
-        <ContractList
-          contracts={contracts}
-          loading={loading}
-          error={error}
-        />
+        <ContractList contracts={contracts} loading={loading} error={error} />
       </div>
     </div>
   );
