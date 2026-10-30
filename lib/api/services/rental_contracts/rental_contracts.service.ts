@@ -2,6 +2,7 @@ import { Prisma, rental_contracts } from "@/generated/prisma/client";
 import type { PaginationResult } from "@/lib/types/api.type";
 import {
   rentalContractRepository,
+  RentalContractWithDetails,
   type CreateFullContractParams,
   type FindManyRentalContractParams,
 } from "../../repositories/rental_contracts/rental_contracts.repository";
@@ -37,7 +38,7 @@ export const rentalContractService = {
     }
   },
 
-  getById: async (id: bigint): Promise<rental_contracts> => {
+  getById: async (id: bigint): Promise<RentalContractWithDetails> => {
     try {
       const rental_contract = await rentalContractRepository.findById(id);
 
@@ -73,7 +74,7 @@ export const rentalContractService = {
   updateRentalContract: async (
     id: bigint,
     input: Prisma.rental_contractsUpdateInput,
-  ): Promise<rental_contracts> => {
+  ): Promise<RentalContractWithDetails> => {
     try {
       return await rentalContractRepository.updateRentalContract(id, input);
     } catch (error) {

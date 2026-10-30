@@ -16,7 +16,9 @@ export type ContractTenantInput = Omit<
 export type CreateProfileInput = Omit<
   Prisma.profilesCreateInput,
   "users" | "user_id"
->;
+  >;
+
+  
 
 // Type lọc nâng cao định nghĩa theo sắp hết hạn và hết hạn
 export type ExpirationFilter = "expiring_soon" | "expired";
@@ -53,8 +55,22 @@ export type CreateFullContractParams = {
   tenants: TenantItemInput[]; // Danh sách N người thuê
 };
 
+// Type dữ liệu một hợp đồng kèm phòng và người thuê
+export type RentalContractWithDetails =
+  Prisma.rental_contractsGetPayload<{
+    include: {
+      rooms: true;
+      contract_tenants: {
+        include: {
+          profiles: true;
+        };
+      };
+    };
+  }>;
+
+// Type kết quả danh sách hợp đồng
 type FindManyResultRentalContract = {
-  rental_contracts: rental_contracts[];
+  rental_contracts: RentalContractWithDetails[];
   total: number;
 };
 
@@ -205,7 +221,7 @@ export const rentalContractRepository = {
   },
 
   // Tìm theo ID
-  findById: async (id: bigint): Promise<rental_contracts | null> => {
+  findById: async (id: bigint): Promise<RentalContractWithDetails | null> => {
     return prisma.rental_contracts.findUnique({
       where: { id },
       include: {
@@ -295,10 +311,18 @@ export const rentalContractRepository = {
   updateRentalContract: async (
     id: bigint,
     input: Prisma.rental_contractsUpdateInput,
-  ): Promise<rental_contracts> => {
+  ): Promise<RentalContractWithDetails> => {
     return prisma.rental_contracts.update({
       where: { id },
       data: input,
+      include: {
+        rooms: true,
+        contract_tenants: {
+          include: {
+            profiles: true,
+          }
+        }
+      }
     });
   },
 

@@ -29,7 +29,7 @@ export async function GET(req: NextRequest, { params }: routeContext) {
   }
 }
 
-export async function PUT(req: NextRequest, { params }: routeContext) {
+export async function PATCH(req: NextRequest, { params }: routeContext) {
   try {
     const { id } = await params;
     const contractId = parseId(id);

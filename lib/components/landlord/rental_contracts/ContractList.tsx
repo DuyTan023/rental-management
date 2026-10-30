@@ -1,14 +1,12 @@
 "use client";
 
 import {
-  ChevronLeft,
-  ChevronRight,
   Eye,
   FileText,
   MoreHorizontal,
   Pencil,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +17,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import {
   Table,
   TableBody,
@@ -27,119 +34,65 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { RentalContractWithDetails } from "@/lib/api/repositories/rental_contracts/rental_contracts.repository";
+import { Decimal } from "@prisma/client/runtime/client";
+import { rental_contract_status } from "@/generated/prisma/enums";
+import Link from "next/link";
 
-type ContractStatus =
-  | "DRAFT"
-  | "ACTIVE"
-  | "EXPIRED"
-  | "TERMINATED"
-  | "COMPLETED";
-
-type Contract = {
-  id: string;
-  contract_number: string;
-  room_number: string;
-  tenant_name: string;
-  start_date: string;
-  end_date: string | null;
-  status: ContractStatus;
+type ContractProps = {
+  contracts:RentalContractWithDetails[],
+  loading: boolean;
+  error: string | null;
 };
 
-const MOCK_CONTRACTS: Contract[] = [
-  {
-    id: "1",
-    contract_number: "HD1510262028",
-    room_number: "P101",
-    tenant_name: "Nguyễn Văn An",
-    start_date: "2026-10-15",
-    end_date: "2027-10-14",
-    status: "ACTIVE",
+const format = {
+  // Format trạng hợp đồng
+  roomStatus: (status: string) => {
+    const statuses: Record<string, string> = {
+      DRAFT: "Bản nháp",
+      ACTIVE: "Đang hoạt động",
+      EXPIRED: "Đã hết hạn",
+      TERMINATED: "Đã chấm dứt",
+      COMPLETED: "Đã hoàn thành",
+    };
+
+    return statuses[status] ?? status;
   },
-  {
-    id: "2",
-    contract_number: "HD2010262029",
-    room_number: "P102",
-    tenant_name: "Trần Thị Bình",
-    start_date: "2026-10-20",
-    end_date: "2027-04-19",
-    status: "ACTIVE",
+
+  // Format giá tiền
+  currency: (price: Decimal | number | string) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    }).format(Number(price));
   },
-  {
-    id: "3",
-    contract_number: "HD0510262030",
-    room_number: "P103",
-    tenant_name: "Lê Văn Cường",
-    start_date: "2026-10-05",
-    end_date: "2026-12-31",
-    status: "DRAFT",
+
+  // Format thời gian
+
+  // Format thời gian
+  date: (date: Date | string | null) => {
+    if (!date) return "—";
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) return "—";
+
+    return new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(parsedDate);
   },
-  {
-    id: "4",
-    contract_number: "HD0101262031",
-    room_number: "P201",
-    tenant_name: "Phạm Thị Dung",
-    start_date: "2026-01-01",
-    end_date: "2026-10-01",
-    status: "EXPIRED",
-  },
-  {
-    id: "5",
-    contract_number: "HD0109252032",
-    room_number: "P202",
-    tenant_name: "Hoàng Văn Đức",
-    start_date: "2025-09-01",
-    end_date: "2026-08-31",
-    status: "COMPLETED",
-  },
-  {
-    id: "6",
-    contract_number: "HD1508262033",
-    room_number: "P203",
-    tenant_name: "Đỗ Thị Hà",
-    start_date: "2026-08-15",
-    end_date: "2027-08-14",
-    status: "TERMINATED",
-  },
-  {
-    id: "7",
-    contract_number: "HD0111262034",
-    room_number: "P301",
-    tenant_name: "Nguyễn Minh Khang",
-    start_date: "2026-11-01",
-    end_date: "2027-10-31",
-    status: "DRAFT",
-  },
-  {
-    id: "8",
-    contract_number: "HD1511262035",
-    room_number: "P302",
-    tenant_name: "Vũ Thị Lan",
-    start_date: "2026-11-15",
-    end_date: "2027-11-14",
-    status: "ACTIVE",
-  },
-  {
-    id: "9",
-    contract_number: "HD0107262036",
-    room_number: "P303",
-    tenant_name: "Bùi Văn Nam",
-    start_date: "2026-07-01",
-    end_date: "2027-06-30",
-    status: "ACTIVE",
-  },
-  {
-    id: "10",
-    contract_number: "HD0105262037",
-    room_number: "P401",
-    tenant_name: "Đặng Thị Oanh",
-    start_date: "2026-05-01",
-    end_date: "2026-10-31",
-    status: "EXPIRED",
-  },
-];
+
+};
 
 const STATUS_CONFIG: Record<
-  ContractStatus,
+  rental_contract_status,
   { label: string; className: string }
 > = {
   DRAFT: {
@@ -164,30 +117,59 @@ const STATUS_CONFIG: Record<
   },
 };
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
-function formatDate(date: string | null) {
-  if (!date) return "Không xác định";
+export function ContractList({contracts, loading, error}: ContractProps) {
+    const [page, setPage] = useState(1);
 
-  const [year, month, day] = date.split("-");
-  return `${day}/${month}/${year}`;
-}
+    // Tổng số trang
+    const total = contracts.length;
+    const totalPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  
+    // Nếu danh sách thay đổi và số trang giảm,
+    // tự động đưa trang hiện tại về trang hợp lệ.
+    const currentPage = Math.min(page, totalPage);
+  
+    // Chỉ lấy các phòng thuộc trang hiện tại
+    // Chỉ lấy các phòng thuộc trang hiện tại
+      const currentContracts = useMemo(() => {
+        const startIndex = (currentPage - 1) * PAGE_SIZE;
+    
+        return contracts.slice(startIndex, startIndex + PAGE_SIZE);
+      }, [contracts]);
 
-export function ContractList() {
-  const [contracts] = useState<Contract[]>(MOCK_CONTRACTS);
-  const [currentPage, setCurrentPage] = useState(1);
+  // Khoảng dữ liệu đang hiển thị
+  const startIndex = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const endIndex = Math.min(currentPage * PAGE_SIZE, total);
 
-  const totalItems = contracts.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  // Danh sách số trang
+  const getPageNumbers = () => {
+    const pages: number[] = [];
 
-  const startIndex = (currentPage - 1) * PAGE_SIZE;
-  const currentContracts = contracts.slice(startIndex, startIndex + PAGE_SIZE);
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPage, currentPage + 2);
 
-  const handleView = (contract: Contract) => {
+    if (currentPage <= 2) {
+      end = Math.min(totalPage, 5);
+    }
+
+    if (currentPage >= totalPage - 1) {
+      start = Math.max(1, totalPage - 4);
+    }
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    return pages;
+  };
+
+
+  const handleView = (contract: RentalContractWithDetails) => {
     console.log("Xem hợp đồng:", contract.id);
   };
 
-  const handleEdit = (contract: Contract) => {
+  const handleEdit = (contract: RentalContractWithDetails) => {
     console.log("Chỉnh sửa hợp đồng:", contract.id);
   };
 
@@ -211,7 +193,7 @@ export function ContractList() {
           </div>
         </div>
 
-        <Badge variant="secondary">{totalItems} hợp đồng</Badge>
+        <Badge variant="secondary">{contracts.length} hợp đồng</Badge>
       </CardHeader>
 
       {/* Bảng hợp đồng */}
@@ -241,8 +223,8 @@ export function ContractList() {
             </TableHeader>
 
             <TableBody>
-              {currentContracts.length > 0 ? (
-                currentContracts.map((contract) => {
+              {currentContracts.length ? (
+                currentContracts.map((contract, i) => {
                   const status = STATUS_CONFIG[contract.status];
 
                   return (
@@ -252,14 +234,18 @@ export function ContractList() {
                       </TableCell>
 
                       <TableCell>
-                        <Badge variant="outline">{contract.room_number}</Badge>
+                        <Badge variant="outline">{contract.rooms.room_number}</Badge>
                       </TableCell>
 
-                      <TableCell>{contract.tenant_name}</TableCell>
+                      <TableCell>
+                          {contract.contract_tenants.find(
+                            (tenant) => tenant.role === "REPRESENTATIVE"
+                          )?.profiles?.full_name ?? "Chưa có người đại diện"}
+                        </TableCell>
 
-                      <TableCell>{formatDate(contract.start_date)}</TableCell>
+                      <TableCell>{format.date(contract.start_date)}</TableCell>
 
-                      <TableCell>{formatDate(contract.end_date)}</TableCell>
+                      <TableCell>{format.date(contract.end_date)}</TableCell>
 
                       <TableCell>
                         <Badge variant="outline" className={status.className}>
@@ -268,35 +254,12 @@ export function ContractList() {
                       </TableCell>
 
                       <TableCell className="pr-4 text-center sm:pr-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label="Mở menu thao tác"
-                              />
-                            }
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </DropdownMenuTrigger>
-
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleView(contract)}
-                            >
-                              <Eye className="mr-2 size-4" />
-                              Xem chi tiết
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              onClick={() => handleEdit(contract)}
-                            >
-                              <Pencil className="mr-2 size-4" />
-                              Chỉnh sửa
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Link href={`/landlord/rental_contracts/${contract.id}`}>
+                            <Button className="bg-white text-black border-2 border-black">
+                            <Eye className="mr-2 size-4" />
+                            Xem chi tiết
+                            </Button>
+                        </Link>            
                       </TableCell>
                     </TableRow>
                   );
@@ -316,55 +279,69 @@ export function ContractList() {
         </div>
 
         {/* Phân trang */}
-        <div className="flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p className="text-sm text-muted-foreground">
-            {totalItems === 0
-              ? "Chưa có dữ liệu"
-              : `Hiển thị ${startIndex + 1}–${Math.min(
-                  startIndex + PAGE_SIZE,
-                  totalItems,
-                )} trong tổng số ${totalItems} hợp đồng`}
-          </p>
+              {/* Phân trang */}
+              {totalPage > 1 && (
+                <div className="flex flex-col items-center justify-between gap-3 border-t pt-4 sm:flex-row">
+                  <p className="text-sm text-muted-foreground">
+                    Hiển thị {startIndex}–{endIndex} trong {total} phòng
+                  </p>
 
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Trang trước"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
+                  <Pagination className="mx-0 w-auto">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          href="#"
+                          onClick={(event) => {
+                            event.preventDefault();
 
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-              (page) => (
-                <Button
-                  key={page}
-                  variant={currentPage === page ? "default" : "outline"}
-                  size="icon"
-                  onClick={() => setCurrentPage(page)}
-                  aria-label={`Trang ${page}`}
-                  aria-current={currentPage === page ? "page" : undefined}
-                >
-                  {page}
-                </Button>
-              ),
-            )}
+                            if (currentPage > 1) {
+                              setPage(currentPage - 1);
+                            }
+                          }}
+                          className={
+                            currentPage === 1
+                              ? "pointer-events-none opacity-50"
+                              : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
 
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Trang sau"
-              disabled={currentPage >= totalPages}
-              onClick={() =>
-                setCurrentPage((page) => Math.min(totalPages, page + 1))
-              }
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
+                      {getPageNumbers().map((pageNumber) => (
+                        <PaginationItem key={pageNumber}>
+                          <PaginationLink
+                            href="#"
+                            isActive={pageNumber === currentPage}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setPage(pageNumber);
+                            }}
+                          >
+                            {pageNumber}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+
+                      <PaginationItem>
+                        <PaginationNext
+                          href="#"
+                          onClick={(event) => {
+                            event.preventDefault();
+
+                            if (currentPage < totalPage) {
+                              setPage(currentPage + 1);
+                            }
+                          }}
+                          className={
+                            currentPage === totalPage
+                              ? "pointer-events-none opacity-50"
+                              : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
       </CardContent>
     </Card>
   );

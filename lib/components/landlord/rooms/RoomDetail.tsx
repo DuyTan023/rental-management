@@ -252,20 +252,28 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                     </p>
                   </div>
 
-                  {currentContract && (
-                    <Badge
-                      variant="outline"
-                      className={
-                        currentContract.status
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : "border-slate-200 bg-slate-100 text-slate-600"
-                      }
-                    >
-                      {currentContract.status
-                        ? "Đang hiệu lực"
-                        : currentContract.status}
-                    </Badge>
-                  )}
+                  <div className="flex gap-3">
+                    {currentContract && (
+                      <Badge
+                        variant="outline"
+                        className={
+                          currentContract.status
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-slate-100 text-slate-600"
+                        }
+                      >
+                        {currentContract.status
+                          ? "Đang hiệu lực"
+                          : currentContract.status}
+                      </Badge>
+                    )}
+                    <Link href={`/landlord/rental_contracts/${currentContract?.id}`}>
+                      
+                        <p className="text-blue-600">Chi tiết</p>
+                     
+                    </Link>
+                  </div>
+                  
                 </div>
               </CardHeader>
 
