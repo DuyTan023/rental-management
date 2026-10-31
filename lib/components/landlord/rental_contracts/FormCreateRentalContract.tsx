@@ -1,30 +1,30 @@
+
 // "use client";
 
-// import {
-//   ArrowLeft,
-//   ArrowRight,
-//   Check,
-//   ClipboardList,
-//   FileText,
-//   House,
-//   Users,
-//   Wallet,
-// } from "lucide-react";
-// import { useCallback, useState } from "react";
+// import { useCallback, useEffect, useState } from "react";
+// import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 
-// import { Badge } from "@/components/ui/badge";
 // import { Button } from "@/components/ui/button";
-// import { Card, CardContent } from "@/components/ui/card";
-// import { Progress } from "@/components/ui/progress";
+// import { Card } from "@/components/ui/card";
+
 // import type { RoomWithCurrentContract } from "@/lib/api/repositories/rooms/rooms.repository";
-// import type { ApiResponse, PaginationResult } from "@/lib/types/api.type";
+// import type {
+//   ApiResponse,
+//   PaginationResult,
+// } from "@/lib/types/api.type";
+
+// import StepSelectRoom from "./StepSelectRoom";
+// import StepTenants, {
+//   type TenantFormData,
+//   type TenantFormField,
+// } from "./StepTenants";
 // import StepContractInfo, {
+//   generateContractNumber,
 //   type RentalContractFormData,
 // } from "./StepContractInfo";
-// import StepDepositSummary, { type DepositFormData } from "./StepDepositSummary";
-// import StepSelectRoom from "./StepSelectRoom";
-// import type { TenantFormData } from "./StepTenants";
-// import StepTenants from "./StepTenants";
+// import StepDepositSummary, {
+//   type DepositFormData,
+// } from "./StepDepositSummary";
 
 // // ============================================================
 // // HELPER
@@ -33,7 +33,9 @@
 // function createEmptyTenant(id: string): TenantFormData {
 //   return {
 //     id,
+//     profile_id: null,
 //     full_name: "",
+//     email: "",
 //     phone: "",
 //     identity_number: "",
 //     date_of_birth: "",
@@ -44,21 +46,57 @@
 //   };
 // }
 
+// const STEPS = [
+//   {
+//     id: 1,
+//     title: "Chọn phòng",
+//     description: "Chọn phòng muốn cho thuê",
+//   },
+//   {
+//     id: 2,
+//     title: "Người thuê",
+//     description: "Thông tin người thuê phòng",
+//   },
+//   {
+//     id: 3,
+//     title: "Hợp đồng",
+//     description: "Thời hạn và giá thuê",
+//   },
+//   {
+//     id: 4,
+//     title: "Tiền cọc",
+//     description: "Xác nhận tiền cọc",
+//   },
+// ];
+
 // // ============================================================
-// // MAIN COMPONENT
+// // COMPONENT
 // // ============================================================
 
 // export default function FormCreateRentalContract() {
-//   // Danh sách phòng
+//   // ----------------------------------------------------------
+//   // STEP STATE
+//   // ----------------------------------------------------------
+
+//   const [currentStep, setCurrentStep] = useState(1);
+//   const [stepError, setStepError] = useState("");
+
+//   // ----------------------------------------------------------
+//   // ROOM STATE
+//   // ----------------------------------------------------------
+
 //   const [rooms, setRooms] = useState<RoomWithCurrentContract[]>([]);
 //   const [loading, setLoading] = useState(true);
 //   const [error, setError] = useState<string | null>(null);
-//   const [currentStep, setCurrentStep] = useState(1);
 
-//   // Bước 1: Phòng
-//   const [selectedRoomId, setSelectedRoomId] = useState<bigint | null>(null);
+//   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(
+//     null,
+//   );
 
-//   // Bước 2: Người thuê
+//   // ----------------------------------------------------------
+//   // TENANT STATE
+//   // ----------------------------------------------------------
+
 //   const [tenants, setTenants] = useState<TenantFormData[]>([
 //     {
 //       ...createEmptyTenant("tenant-1"),
@@ -66,121 +104,34 @@
 //     },
 //   ]);
 
-//   // Bước 3: Hợp đồng
-//   const [contract, setContract] = useState<RentalContractFormData>({
-//     contract_number: "",
+//   // ----------------------------------------------------------
+//   // CONTRACT STATE
+//   // ----------------------------------------------------------
+
+//   const [contract, setContract] = useState<RentalContractFormData>(() => ({
+//     contract_number: generateContractNumber(),
 //     start_date: "",
 //     end_date: "",
 //     rent_price: "",
-//     billing_day: "5",
+//     billing_day: "",
 //     note: "",
-//   });
+//   }));
 
-//   // Bước 4: Tiền cọc
+//   // ----------------------------------------------------------
+//   // DEPOSIT STATE
+//   // ----------------------------------------------------------
+
 //   const [deposit, setDeposit] = useState<DepositFormData>({
-//     initial_amount: "",
+//     initial_amount: "0",
+//     status: "NOT_RECEIVED",
 //     received_date: "",
 //     note: "",
 //   });
 
-//   const progress = (currentStep / 4) * 100;
+//   // ----------------------------------------------------------
+//   // GET ALL ROOMS
+//   // ----------------------------------------------------------
 
-//   const steps = [
-//     {
-//       id: 1,
-//       title: "Chọn phòng",
-//       description: "Thông tin phòng thuê",
-//       icon: House,
-//     },
-//     {
-//       id: 2,
-//       title: "Người thuê",
-//       description: "Thông tin các thành viên",
-//       icon: Users,
-//     },
-//     {
-//       id: 3,
-//       title: "Hợp đồng",
-//       description: "Thời hạn và giá thuê",
-//       icon: FileText,
-//     },
-//     {
-//       id: 4,
-//       title: "Tiền cọc",
-//       description: "Tiền cọc và xác nhận",
-//       icon: Wallet,
-//     },
-//   ];
-
-//   // ==========================================================
-//   // HANDLERS
-//   // ==========================================================
-
-//   function handleAddTenant() {
-//     setTenants((prev) => [...prev, createEmptyTenant(`tenant-${Date.now()}`)]);
-//   }
-
-//   function handleRemoveTenant(id: string) {
-//     setTenants((prev) => {
-//       const removedTenant = prev.find((tenant) => tenant.id === id);
-//       const next = prev.filter((tenant) => tenant.id !== id);
-
-//       // Nếu xóa người đại diện, chọn người đầu tiên còn lại.
-//       if (removedTenant?.role === "REPRESENTATIVE" && next.length > 0) {
-//         next[0] = {
-//           ...next[0],
-//           role: "REPRESENTATIVE",
-//         };
-//       }
-
-//       return next;
-//     });
-//   }
-
-//   function handleTenantChange(
-//     id: string,
-//     field: keyof TenantFormData,
-//     value: string,
-//   ) {
-//     setTenants((prev) =>
-//       prev.map((tenant) =>
-//         tenant.id === id ? { ...tenant, [field]: value } : tenant,
-//       ),
-//     );
-//   }
-
-//   function handleSetRepresentative(id: string) {
-//     setTenants((prev) =>
-//       prev.map((tenant) => ({
-//         ...tenant,
-//         role: tenant.id === id ? "REPRESENTATIVE" : "MEMBER",
-//       })),
-//     );
-//   }
-
-//   function handleNext() {
-//     setCurrentStep((prev) => Math.min(prev + 1, 4));
-//   }
-
-//   function handlePrevious() {
-//     setCurrentStep((prev) => Math.max(prev - 1, 1));
-//   }
-
-//   function handleFinish() {
-//     // Chỉ phục vụ kiểm tra giao diện, chưa gọi API.
-//     console.log("Thông tin hợp đồng mẫu:", {
-//       room: selectedRoom,
-//       tenants,
-//       contract,
-//       deposit,
-//     });
-
-//     alert(
-//       "Đây là giao diện tĩnh. Chức năng tạo hợp đồng chưa được kết nối API.",
-//     );
-//   }
-
-//   //Gọi API lấy danh sách các phòng
 //   const getAllRoom = useCallback(async () => {
 //     try {
 //       setLoading(true);
@@ -195,17 +146,23 @@
 //       do {
 //         const response = await fetch(
 //           `/api/landlord/rooms?page=${page}&limit=${limit}`,
+//           {
+//             cache: "no-store",
+//           },
 //         );
 
 //         if (!response.ok) {
 //           throw new Error("Không thể lấy danh sách phòng");
 //         }
 
-//         const result: ApiResponse<PaginationResult<RoomWithCurrentContract>> =
-//           await response.json();
+//         const result: ApiResponse<
+//           PaginationResult<RoomWithCurrentContract>
+//         > = await response.json();
 
 //         if (!result.success || !result.data) {
-//           throw new Error(result.message || "Lấy danh sách phòng thất bại");
+//           throw new Error(
+//             result.message || "Lấy danh sách phòng thất bại",
+//           );
 //         }
 
 //         allRooms.push(...result.data.data);
@@ -228,136 +185,444 @@
 //     }
 //   }, []);
 
-//   // Gọi API khi component đc mount
-//   // useEffect(() => {
-//   //   void getAllRoom();
-//   // }, [getAllRoom]);
+//   useEffect(() => {
+//     void getAllRoom();
+//   }, [getAllRoom]);
 
-//   // Chỉ lấy các phòng còn trống
-//   const availableRooms = rooms.filter((room) => room.status === "AVAILABLE");
-//   setRooms(availableRooms);
+//   // ----------------------------------------------------------
+//   // ROOM DATA
+//   // ----------------------------------------------------------
 
-//   //Hàm gán selectRoomId
-//   const handleSelectRoom = (room: RoomWithCurrentContract) => {
-//     setSelectedRoomId(room.id);
+//   const availableRooms = rooms.filter(
+//     (room) => room.status === "AVAILABLE",
+//   );
+
+//   const selectedRoom = rooms.find(
+//     (room) => String(room.id) === selectedRoomId,
+//   );
+
+//   // ----------------------------------------------------------
+//   // TENANT HANDLERS
+//   // ----------------------------------------------------------
+
+//   const handleAddTenant = () => {
+//     const newTenant = createEmptyTenant(
+//       `tenant-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+//     );
+
+//     setTenants((prev) => [...prev, newTenant]);
 //   };
 
-//   // duyệt lấy phòng đang đc chọn để tạo hợp đồng
-//   const selectedRoom = rooms.find((room) => room.id === selectedRoomId);
+//   const handleRemoveTenant = (id: string) => {
+//     setTenants((prev) => {
+//       if (prev.length <= 1) {
+//         return prev;
+//       }
 
-//   // ==========================================================
+//       const removedTenant = prev.find(
+//         (tenant) => tenant.id === id,
+//       );
+
+//       const remainingTenants = prev.filter(
+//         (tenant) => tenant.id !== id,
+//       );
+
+//       if (removedTenant?.role === "REPRESENTATIVE") {
+//         remainingTenants[0] = {
+//           ...remainingTenants[0],
+//           role: "REPRESENTATIVE",
+//         };
+//       }
+
+//       return remainingTenants;
+//     });
+//   };
+
+//   const handleTenantChange = (
+//     id: string,
+//     field: TenantFormField,
+//     value: string | null,
+//   ) => {
+//     setTenants((prev) =>
+//       prev.map((tenant) =>
+//         tenant.id === id
+//           ? {
+//               ...tenant,
+//               [field]: value,
+//             }
+//           : tenant,
+//       ),
+//     );
+//   };
+
+//   const handleSetRepresentative = (id: string) => {
+//     setTenants((prev) =>
+//       prev.map((tenant) => ({
+//         ...tenant,
+//         role:
+//           tenant.id === id
+//             ? "REPRESENTATIVE"
+//             : "MEMBER",
+//       })),
+//     );
+//   };
+
+//   // ----------------------------------------------------------
+//   // SELECT ROOM
+//   // ----------------------------------------------------------
+
+//   const handleSelectRoom = (room: RoomWithCurrentContract) => {
+//     setSelectedRoomId(String(room.id));
+
+//     // Lấy giá thuê niêm yết làm giá thuê mặc định.
+//     setContract((prev) => ({
+//       ...prev,
+//       rent_price: String(room.listed_rent ?? ""),
+//     }));
+
+//     setStepError("");
+//   };
+
+//   const handleChangeRoom = () => {
+//     setCurrentStep(1);
+//     setStepError("");
+//   };
+
+//   // ----------------------------------------------------------
+//   // VALIDATE STEP
+//   // ----------------------------------------------------------
+
+//   const validateCurrentStep = (): boolean => {
+//     setStepError("");
+
+//     // Step 1: Chọn phòng
+//     if (currentStep === 1) {
+//       if (!selectedRoomId || !selectedRoom) {
+//         setStepError("Vui lòng chọn phòng trước khi tiếp tục.");
+//         return false;
+//       }
+
+//       if (selectedRoom.status !== "AVAILABLE") {
+//         setStepError(
+//           "Phòng này hiện không còn ở trạng thái có thể cho thuê.",
+//         );
+//         return false;
+//       }
+
+//       return true;
+//     }
+
+//     // Step 2: Thông tin người thuê
+//     if (currentStep === 2) {
+//       if (tenants.length === 0) {
+//         setStepError("Vui lòng thêm ít nhất một người thuê.");
+//         return false;
+//       }
+
+//       const representatives = tenants.filter(
+//         (tenant) => tenant.role === "REPRESENTATIVE",
+//       );
+
+//       if (representatives.length !== 1) {
+//         setStepError(
+//           "Hợp đồng phải có đúng một người đại diện.",
+//         );
+//         return false;
+//       }
+
+//       // const invalidTenant = tenants.find(
+//       //   (tenant) =>
+//       //     !tenant.full_name.trim() ||
+//       //     !tenant.phone.trim(),
+//       // );
+
+//       // if (invalidTenant) {
+//       //   setStepError(
+//       //     "Vui lòng nhập đầy đủ họ tên và số điện thoại của tất cả người thuê.",
+//       //   );
+//       //   return false;
+//       // }
+
+//       const invalidTenant = tenants.find((tenant) => {
+//         if (!tenant.full_name.trim() || !tenant.phone.trim()) {
+//           return true;
+//         }
+
+//         // Người thuê mới bắt buộc có email hợp lệ.
+//         if (!tenant.profile_id) {
+//           const email = tenant.email.trim();
+
+//           if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+//             return true;
+//           }
+//         }
+
+//         return false;
+//       });
+
+//       if (invalidTenant) {
+//         setStepError(
+//           "Vui lòng kiểm tra họ tên, số điện thoại và email của người thuê mới.",
+//         );
+//         return false;
+//       }
+
+//       return true;
+//     }
+
+//     // Step 3: Thông tin hợp đồng
+//     if (currentStep === 3) {
+//       if (!contract.start_date) {
+//         setStepError("Vui lòng chọn ngày bắt đầu hợp đồng.");
+//         return false;
+//       }
+
+//       if (
+//         contract.end_date &&
+//         contract.end_date < contract.start_date
+//       ) {
+//         setStepError(
+//           "Ngày kết thúc không được nhỏ hơn ngày bắt đầu.",
+//         );
+//         return false;
+//       }
+
+//       const rentPrice = Number(contract.rent_price);
+
+//       if (
+//         !contract.rent_price ||
+//         !Number.isFinite(rentPrice) ||
+//         rentPrice <= 0
+//       ) {
+//         setStepError("Vui lòng nhập tiền thuê hợp lệ.");
+//         return false;
+//       }
+
+//       const billingDay = Number(contract.billing_day);
+
+//       if (
+//         !contract.billing_day ||
+//         !Number.isInteger(billingDay) ||
+//         billingDay < 1 ||
+//         billingDay > 31
+//       ) {
+//         setStepError("Vui lòng chọn ngày thanh toán hợp lệ.");
+//         return false;
+//       }
+
+//       return true;
+//     }
+
+//     // Step 4: Tiền cọc
+//     if (currentStep === 4) {
+//       const initialAmount = Number(deposit.initial_amount);
+
+//       if (
+//         deposit.initial_amount.trim() === "" ||
+//         !Number.isFinite(initialAmount) ||
+//         initialAmount < 0
+//       ) {
+//         setStepError("Vui lòng nhập số tiền cọc hợp lệ.");
+//         return false;
+//       }
+
+//       if (
+//         deposit.status === "RECEIVED" &&
+//         !deposit.received_date
+//       ) {
+//         setStepError(
+//           "Vui lòng chọn ngày thực tế nhận tiền cọc.",
+//         );
+//         return false;
+//       }
+
+//       if (
+//         deposit.status === "RECEIVED" &&
+//         deposit.received_date > new Date().toISOString().slice(0, 10)
+//       ) {
+//         setStepError("Ngày nhận cọc không được ở tương lai.");
+//         return false;
+//       }
+
+//       return true;
+//     }
+
+//     return true;
+//   };
+
+//   // ----------------------------------------------------------
+//   // NAVIGATION
+//   // ----------------------------------------------------------
+
+//   const handleNextStep = () => {
+//     if (!validateCurrentStep()) {
+//       return;
+//     }
+
+//     if (currentStep < 4) {
+//       setCurrentStep((prev) => prev + 1);
+//       setStepError("");
+//     }
+//   };
+
+//   const handlePreviousStep = () => {
+//     if (currentStep > 1) {
+//       setCurrentStep((prev) => prev - 1);
+//       setStepError("");
+//     }
+//   };
+
+//   // ----------------------------------------------------------
+//   // TEMPORARY SUBMIT
+//   // ----------------------------------------------------------
+
+//   const handleSubmit = () => {
+//     if (!validateCurrentStep()) {
+//       return;
+//     }
+
+//     const payload = {
+//       room_id: selectedRoomId,
+
+//       tenants: tenants.map((tenant) => ({
+//         profile_id: tenant.profile_id,
+//         full_name: tenant.full_name.trim(),
+//         phone: tenant.phone.trim(),
+//         identity_number: tenant.identity_number || null,
+//         date_of_birth: tenant.date_of_birth || null,
+//         province_code: tenant.province_code || null,
+//         ward_code: tenant.ward_code || null,
+//         address_detail: tenant.address_detail.trim() || null,
+//         role: tenant.role,
+//       })),
+
+//       contract: {
+//         contract_number: contract.contract_number,
+//         start_date: contract.start_date,
+//         end_date: contract.end_date || null,
+//         rent_price: Number(contract.rent_price),
+//         billing_day: Number(contract.billing_day),
+//         note: contract.note.trim() || null,
+//       },
+
+//       deposit: {
+//         initial_amount: Number(deposit.initial_amount),
+//         status: deposit.status,
+//         received_date:
+//           deposit.status === "RECEIVED"
+//             ? deposit.received_date || null
+//             : null,
+//         note: deposit.note.trim() || null,
+//       },
+//     };
+
+//     // Tạm thời kiểm tra dữ liệu trước khi kết nối API.
+//     console.log("Dữ liệu tạo hợp đồng:", payload);
+//   };
+
+//   // ----------------------------------------------------------
+//   // RENDER LOADING / ERROR
+//   // ----------------------------------------------------------
+
+//   if (loading) {
+//     return (
+//       <p className="text-sm text-muted-foreground">
+//         Đang tải danh sách phòng...
+//       </p>
+//     );
+//   }
+
+//   if (error) {
+//     return (
+//       <div className="space-y-3">
+//         <p className="text-sm text-red-500">{error}</p>
+
+//         <Button
+//           type="button"
+//           variant="outline"
+//           onClick={getAllRoom}
+//         >
+//           Thử lại
+//         </Button>
+//       </div>
+//     );
+//   }
+
+//   // ----------------------------------------------------------
 //   // RENDER
-//   // ==========================================================
+//   // ----------------------------------------------------------
 
 //   return (
-//     <div className="mx-auto w-full space-y-6 pb-10">
-//       {/* Header */}
+//     <div className="space-y-6">
+//       {/* STEP INDICATOR */}
 
-//       <div className="space-y-2">
-//         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-//           <span>Hợp đồng</span>
-//           <span>/</span>
-//           <span className="text-foreground">Tạo hợp đồng</span>
-//         </div>
+//       <Card className="p-4">
+//         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+//           {STEPS.map((step) => {
+//             const isActive = currentStep === step.id;
+//             const isCompleted = currentStep > step.id;
 
-//         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-//           <div>
-//             <h1 className="text-2xl font-bold tracking-tight">
-//               Tạo hợp đồng thuê phòng
-//             </h1>
-
-//             <p className="mt-1 text-sm text-muted-foreground">
-//               Điền thông tin theo từng bước để tạo hợp đồng thuê phòng mới.
-//             </p>
-//           </div>
-
-//           <Badge variant="outline" className="w-fit gap-1.5 py-1">
-//             <ClipboardList className="h-3.5 w-3.5" />
-//             Bản nháp giao diện
-//           </Badge>
-//         </div>
-//       </div>
-
-//       {/* Stepper */}
-
-//       <Card>
-//         <CardContent className="space-y-5 p-5">
-//           <div className="flex items-center justify-between gap-2">
-//             <div>
-//               <p className="text-sm text-muted-foreground">
-//                 Bước {currentStep} / 4
-//               </p>
-
-//               <p className="font-semibold">{steps[currentStep - 1].title}</p>
-//             </div>
-
-//             <p className="text-sm font-medium text-muted-foreground">
-//               {Math.round(progress)}%
-//             </p>
-//           </div>
-
-//           <Progress value={progress} className="h-2" />
-
-//           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-//             {steps.map((step) => {
-//               const Icon = step.icon;
-//               const isActive = currentStep === step.id;
-//               const isCompleted = currentStep > step.id;
-
-//               return (
-//                 <button
-//                   key={step.id}
-//                   type="button"
-//                   onClick={() => setCurrentStep(step.id)}
-//                   className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
-//                     isActive
-//                       ? "border-primary bg-primary/5"
-//                       : isCompleted
-//                         ? "border-green-200 bg-green-50/50"
-//                         : "border-border hover:bg-muted/50"
+//             return (
+//               <button
+//                 key={step.id}
+//                 type="button"
+//                 onClick={() => {
+//                   if (step.id < currentStep) {
+//                     setCurrentStep(step.id);
+//                     setStepError("");
+//                   }
+//                 }}
+//                 disabled={step.id > currentStep}
+//                 className="flex min-w-0 items-center gap-2 text-left disabled:cursor-not-allowed"
+//               >
+//                 <div
+//                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition-colors ${
+//                     isCompleted
+//                       ? "border-primary bg-primary text-primary-foreground"
+//                       : isActive
+//                         ? "border-primary bg-primary/10 text-primary"
+//                         : "border-muted bg-muted text-muted-foreground"
 //                   }`}
 //                 >
-//                   <div
-//                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+//                   {isCompleted ? (
+//                     <Check className="h-4 w-4" />
+//                   ) : (
+//                     step.id
+//                   )}
+//                 </div>
+
+//                 <div className="min-w-0">
+//                   <p
+//                     className={`truncate text-sm font-semibold ${
 //                       isActive
-//                         ? "bg-primary text-primary-foreground"
-//                         : isCompleted
-//                           ? "bg-green-100 text-green-700"
-//                           : "bg-muted text-muted-foreground"
+//                         ? "text-primary"
+//                         : "text-foreground"
 //                     }`}
 //                   >
-//                     {isCompleted ? (
-//                       <Check className="h-4 w-4" />
-//                     ) : (
-//                       <Icon className="h-4 w-4" />
-//                     )}
-//                   </div>
+//                     {step.title}
+//                   </p>
 
-//                   <div className="min-w-0">
-//                     <p className="text-sm font-medium">{step.title}</p>
-
-//                     <p className="mt-1 hidden text-xs text-muted-foreground sm:block">
-//                       {step.description}
-//                     </p>
-//                   </div>
-//                 </button>
-//               );
-//             })}
-//           </div>
-//         </CardContent>
+//                   <p className="hidden truncate text-xs text-muted-foreground sm:block">
+//                     {step.description}
+//                   </p>
+//                 </div>
+//               </button>
+//             );
+//           })}
+//         </div>
 //       </Card>
 
-//       {/* Step 1: Chọn phòng */}
+//       {/* STEP 1: CHỌN PHÒNG */}
 
 //       {currentStep === 1 && (
 //         <StepSelectRoom
-//           rooms={MOCK_ROOMS}
+//           rooms={availableRooms}
 //           selectedRoomId={selectedRoomId}
 //           onSelectRoom={handleSelectRoom}
 //         />
 //       )}
 
-//       {/* Step 2: Người thuê */}
+//       {/* STEP 2: NGƯỜI THUÊ */}
 
 //       {currentStep === 2 && (
 //         <StepTenants
@@ -369,18 +634,18 @@
 //         />
 //       )}
 
-//       {/* Step 3: Thông tin hợp đồng */}
+//       {/* STEP 3: HỢP ĐỒNG */}
 
 //       {currentStep === 3 && (
 //         <StepContractInfo
 //           contract={contract}
 //           selectedRoom={selectedRoom}
 //           onContractChange={setContract}
-//           onChangeRoom={() => setCurrentStep(1)}
+//           onChangeRoom={handleChangeRoom}
 //         />
 //       )}
 
-//       {/* Step 4: Tiền cọc và xác nhận */}
+//       {/* STEP 4: TIỀN CỌC VÀ XÁC NHẬN */}
 
 //       {currentStep === 4 && (
 //         <StepDepositSummary
@@ -393,47 +658,44 @@
 //         />
 //       )}
 
-//       {/* Footer navigation */}
+//       {/* VALIDATION ERROR */}
 
-//       <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/95 px-4 py-4 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
-//         <div className="flex items-center justify-between gap-3">
+//       {stepError && (
+//         <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+//           {stepError}
+//         </p>
+//       )}
+
+//       {/* NAVIGATION BUTTONS */}
+
+//       <div className="flex items-center justify-between gap-3">
+//         <Button
+//           type="button"
+//           variant="outline"
+//           onClick={handlePreviousStep}
+//           disabled={currentStep === 1}
+//         >
+//           <ChevronLeft className="mr-2 h-4 w-4" />
+//           Quay lại
+//         </Button>
+
+//         {currentStep < 4 ? (
 //           <Button
 //             type="button"
-//             variant="outline"
-//             onClick={handlePrevious}
-//             disabled={currentStep === 1}
+//             onClick={handleNextStep}
 //           >
-//             <ArrowLeft className="mr-2 h-4 w-4" />
-//             Quay lại
+//             Tiếp tục
+//             <ChevronRight className="ml-2 h-4 w-4" />
 //           </Button>
-
-//           <div className="flex items-center gap-1.5">
-//             {steps.map((step) => (
-//               <div
-//                 key={step.id}
-//                 className={`h-1.5 rounded-full transition-all ${
-//                   currentStep === step.id
-//                     ? "w-6 bg-primary"
-//                     : currentStep > step.id
-//                       ? "w-3 bg-primary/50"
-//                       : "w-3 bg-muted"
-//                 }`}
-//               />
-//             ))}
-//           </div>
-
-//           {currentStep < 4 ? (
-//             <Button type="button" onClick={handleNext}>
-//               Tiếp tục
-//               <ArrowRight className="ml-2 h-4 w-4" />
-//             </Button>
-//           ) : (
-//             <Button type="button" onClick={handleFinish}>
-//               <Check className="mr-2 h-4 w-4" />
-//               Xác nhận tạo hợp đồng
-//             </Button>
-//           )}
-//         </div>
+//         ) : (
+//           <Button
+//             type="button"
+//             onClick={handleSubmit}
+//           >
+//             Hoàn tất
+//             <Check className="ml-2 h-4 w-4" />
+//           </Button>
+//         )}
 //       </div>
 //     </div>
 //   );
@@ -442,21 +704,143 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 import type { RoomWithCurrentContract } from "@/lib/api/repositories/rooms/rooms.repository";
-import type { ApiResponse, PaginationResult } from "@/lib/types/api.type";
+import type {
+  ApiResponse,
+  PaginationResult,
+} from "@/lib/types/api.type";
 
 import StepSelectRoom from "./StepSelectRoom";
+import StepTenants, {
+  type TenantFormData,
+  type TenantFormField,
+} from "./StepTenants";
+import StepContractInfo, {
+  generateContractNumber,
+  type RentalContractFormData,
+} from "./StepContractInfo";
+import StepDepositSummary, {
+  type DepositFormData,
+} from "./StepDepositSummary";
+
+// ============================================================
+// HELPER
+// ============================================================
+
+function createEmptyTenant(id: string): TenantFormData {
+  return {
+    id,
+    profile_id: null,
+    full_name: "",
+    email: "",
+    phone: "",
+    identity_number: "",
+    date_of_birth: "",
+    province_code: "",
+    ward_code: "",
+    address_detail: "",
+    role: "MEMBER",
+  };
+}
+
+const STEPS = [
+  {
+    id: 1,
+    title: "Chọn phòng",
+    description: "Chọn phòng muốn cho thuê",
+  },
+  {
+    id: 2,
+    title: "Người thuê",
+    description: "Thông tin người thuê phòng",
+  },
+  {
+    id: 3,
+    title: "Hợp đồng",
+    description: "Thời hạn và giá thuê",
+  },
+  {
+    id: 4,
+    title: "Tiền cọc",
+    description: "Xác nhận tiền cọc",
+  },
+];
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export default function FormCreateRentalContract() {
+  // ----------------------------------------------------------
+  // STEP STATE
+  // ----------------------------------------------------------
+
+  const [currentStep, setCurrentStep] = useState(1);
+  const [stepError, setStepError] = useState("");
+
+  // ----------------------------------------------------------
+  // ROOM STATE
+  // ----------------------------------------------------------
+
   const [rooms, setRooms] = useState<RoomWithCurrentContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentStep, setCurrentStep] = useState(1);
 
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(
+    null,
+  );
 
-  // Lấy danh sách phòng từ API
+  // ----------------------------------------------------------
+  // SUBMIT STATE
+  // ----------------------------------------------------------
+
+  const [submitting, setSubmitting] = useState(false);
+
+  // ----------------------------------------------------------
+  // TENANT STATE
+  // ----------------------------------------------------------
+
+  const [tenants, setTenants] = useState<TenantFormData[]>([
+    {
+      ...createEmptyTenant("tenant-1"),
+      role: "REPRESENTATIVE",
+    },
+  ]);
+
+  // ----------------------------------------------------------
+  // CONTRACT STATE
+  // ----------------------------------------------------------
+
+  const [contract, setContract] = useState<RentalContractFormData>(() => ({
+    contract_number: generateContractNumber(),
+    start_date: "",
+    end_date: "",
+    rent_price: "",
+    billing_day: "",
+    note: "",
+  }));
+
+  // ----------------------------------------------------------
+  // DEPOSIT STATE
+  // ----------------------------------------------------------
+
+  const [deposit, setDeposit] = useState<DepositFormData>({
+    initial_amount: "0",
+    status: "NOT_RECEIVED",
+    received_date: "",
+    note: "",
+  });
+
+  // ----------------------------------------------------------
+  // GET ALL ROOMS
+  // ----------------------------------------------------------
+
   const getAllRoom = useCallback(async () => {
     try {
       setLoading(true);
@@ -471,17 +855,23 @@ export default function FormCreateRentalContract() {
       do {
         const response = await fetch(
           `/api/landlord/rooms?page=${page}&limit=${limit}`,
+          {
+            cache: "no-store",
+          },
         );
 
         if (!response.ok) {
           throw new Error("Không thể lấy danh sách phòng");
         }
 
-        const result: ApiResponse<PaginationResult<RoomWithCurrentContract>> =
-          await response.json();
+        const result: ApiResponse<
+          PaginationResult<RoomWithCurrentContract>
+        > = await response.json();
 
         if (!result.success || !result.data) {
-          throw new Error(result.message || "Lấy danh sách phòng thất bại");
+          throw new Error(
+            result.message || "Lấy danh sách phòng thất bại",
+          );
         }
 
         allRooms.push(...result.data.data);
@@ -508,35 +898,576 @@ export default function FormCreateRentalContract() {
     void getAllRoom();
   }, [getAllRoom]);
 
-  // Chỉ lấy các phòng còn trống
-  const availableRooms = rooms.filter((room) => room.status === "AVAILABLE");
+  // ----------------------------------------------------------
+  // ROOM DATA
+  // ----------------------------------------------------------
 
-  // Xử lý chọn phòng
-  const handleSelectRoom = (room: RoomWithCurrentContract) => {
-    setSelectedRoomId(String(room.id));
+  const availableRooms = rooms.filter(
+    (room) => room.status === "AVAILABLE",
+  );
+
+  const selectedRoom = rooms.find(
+    (room) => String(room.id) === selectedRoomId,
+  );
+
+  // ----------------------------------------------------------
+  // TENANT HANDLERS
+  // ----------------------------------------------------------
+
+  const handleAddTenant = () => {
+    const newTenant = createEmptyTenant(
+      `tenant-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    );
+
+    setTenants((prev) => [...prev, newTenant]);
   };
 
-  // Lấy thông tin phòng đã chọn
-  const selectedRoom = rooms.find((room) => String(room.id) === selectedRoomId);
+  const handleRemoveTenant = (id: string) => {
+    setTenants((prev) => {
+      if (prev.length <= 1) {
+        return prev;
+      }
+
+      const removedTenant = prev.find(
+        (tenant) => tenant.id === id,
+      );
+
+      const remainingTenants = prev.filter(
+        (tenant) => tenant.id !== id,
+      );
+
+      if (removedTenant?.role === "REPRESENTATIVE") {
+        remainingTenants[0] = {
+          ...remainingTenants[0],
+          role: "REPRESENTATIVE",
+        };
+      }
+
+      return remainingTenants;
+    });
+  };
+
+  const handleTenantChange = (
+    id: string,
+    field: TenantFormField,
+    value: string | null,
+  ) => {
+    setTenants((prev) =>
+      prev.map((tenant) =>
+        tenant.id === id
+          ? {
+              ...tenant,
+              [field]: value,
+            }
+          : tenant,
+      ),
+    );
+  };
+
+  const handleSetRepresentative = (id: string) => {
+    setTenants((prev) =>
+      prev.map((tenant) => ({
+        ...tenant,
+        role: tenant.id === id ? "REPRESENTATIVE" : "MEMBER",
+      })),
+    );
+  };
+
+  // ----------------------------------------------------------
+  // SELECT ROOM
+  // ----------------------------------------------------------
+
+  const handleSelectRoom = (room: RoomWithCurrentContract) => {
+    setSelectedRoomId(String(room.id));
+
+    setContract((prev) => ({
+      ...prev,
+      rent_price: String(room.listed_rent ?? ""),
+    }));
+
+    setStepError("");
+  };
+
+  const handleChangeRoom = () => {
+    setCurrentStep(1);
+    setStepError("");
+  };
+
+  // ----------------------------------------------------------
+  // VALIDATE STEP
+  // ----------------------------------------------------------
+
+  const validateCurrentStep = (): boolean => {
+    setStepError("");
+
+    // Step 1: Chọn phòng
+    if (currentStep === 1) {
+      if (!selectedRoomId || !selectedRoom) {
+        setStepError("Vui lòng chọn phòng trước khi tiếp tục.");
+        return false;
+      }
+
+      if (selectedRoom.status !== "AVAILABLE") {
+        setStepError(
+          "Phòng này hiện không còn ở trạng thái có thể cho thuê.",
+        );
+        return false;
+      }
+
+      return true;
+    }
+
+    // Step 2: Thông tin người thuê
+    if (currentStep === 2) {
+      if (tenants.length === 0) {
+        setStepError("Vui lòng thêm ít nhất một người thuê.");
+        return false;
+      }
+
+      const representatives = tenants.filter(
+        (tenant) => tenant.role === "REPRESENTATIVE",
+      );
+
+      if (representatives.length !== 1) {
+        setStepError("Hợp đồng phải có đúng một người đại diện.");
+        return false;
+      }
+
+      const invalidTenant = tenants.find((tenant) => {
+        if (!tenant.full_name.trim() || !tenant.phone.trim()) {
+          return true;
+        }
+
+        // Người thuê mới bắt buộc có email hợp lệ.
+        if (!tenant.profile_id) {
+          const email = tenant.email.trim();
+
+          if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+
+      if (invalidTenant) {
+        setStepError(
+          "Vui lòng kiểm tra họ tên, số điện thoại và email của người thuê mới.",
+        );
+        return false;
+      }
+
+      return true;
+    }
+
+    // Step 3: Thông tin hợp đồng
+    if (currentStep === 3) {
+      if (!contract.start_date) {
+        setStepError("Vui lòng chọn ngày bắt đầu hợp đồng.");
+        return false;
+      }
+
+      if (
+        contract.end_date &&
+        contract.end_date < contract.start_date
+      ) {
+        setStepError(
+          "Ngày kết thúc không được nhỏ hơn ngày bắt đầu.",
+        );
+        return false;
+      }
+
+      const rentPrice = Number(contract.rent_price);
+
+      if (
+        !contract.rent_price ||
+        !Number.isFinite(rentPrice) ||
+        rentPrice <= 0
+      ) {
+        setStepError("Vui lòng nhập tiền thuê hợp lệ.");
+        return false;
+      }
+
+      const billingDay = Number(contract.billing_day);
+
+      if (
+        !contract.billing_day ||
+        !Number.isInteger(billingDay) ||
+        billingDay < 1 ||
+        billingDay > 31
+      ) {
+        setStepError("Vui lòng chọn ngày thanh toán hợp lệ.");
+        return false;
+      }
+
+      return true;
+    }
+
+    // Step 4: Tiền cọc
+    if (currentStep === 4) {
+      const initialAmount = Number(deposit.initial_amount);
+
+      if (
+        deposit.initial_amount.trim() === "" ||
+        !Number.isFinite(initialAmount) ||
+        initialAmount < 0
+      ) {
+        setStepError("Vui lòng nhập số tiền cọc hợp lệ.");
+        return false;
+      }
+
+      if (
+        deposit.status === "RECEIVED" &&
+        !deposit.received_date
+      ) {
+        setStepError(
+          "Vui lòng chọn ngày thực tế nhận tiền cọc.",
+        );
+        return false;
+      }
+
+      if (
+        deposit.status === "RECEIVED" &&
+        deposit.received_date > new Date().toISOString().slice(0, 10)
+      ) {
+        setStepError("Ngày nhận cọc không được ở tương lai.");
+        return false;
+      }
+
+      return true;
+    }
+
+    return true;
+  };
+
+  // ----------------------------------------------------------
+  // NAVIGATION
+  // ----------------------------------------------------------
+
+  const handleNextStep = () => {
+    if (!validateCurrentStep()) {
+      return;
+    }
+
+    if (currentStep < 4) {
+      setCurrentStep((prev) => prev + 1);
+      setStepError("");
+    }
+  };
+
+  const handlePreviousStep = () => {
+    if (currentStep > 1 && !submitting) {
+      setCurrentStep((prev) => prev - 1);
+      setStepError("");
+    }
+  };
+
+  // ----------------------------------------------------------
+  // SUBMIT CREATE RENTAL CONTRACT
+  // ----------------------------------------------------------
+
+  const handleSubmit = async () => {
+    if (submitting || !validateCurrentStep()) {
+      return;
+    }
+
+    if (!selectedRoomId) {
+      setStepError("Không tìm thấy phòng được chọn.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setStepError("");
+
+      const payload = {
+        inputRentalContract: {
+          room_id: selectedRoomId,
+          contract_number: contract.contract_number.trim(),
+          start_date: contract.start_date,
+          end_date: contract.end_date || null,
+          rent_price: Number(contract.rent_price),
+          billing_day: Number(contract.billing_day),
+          note: contract.note.trim() || null,
+
+          // Không gửi status từ client.
+          // Backend bắt buộc tự đặt status = DRAFT.
+        },
+
+        tenants: tenants.map((tenant) => {
+          // Người thuê đã có hồ sơ:
+          // Chỉ liên kết bằng profile_id.
+          if (tenant.profile_id) {
+            return {
+              profile_id: tenant.profile_id,
+              is_representative:
+                tenant.role === "REPRESENTATIVE",
+            };
+          }
+
+          // Người thuê mới:
+          // Tạo users và profiles trong transaction backend.
+          return {
+            is_representative:
+              tenant.role === "REPRESENTATIVE",
+
+            inputUser: {
+              email: tenant.email.trim(),
+              password_hash: null,
+              role: "TENANT",
+              // Không truyền status để Prisma tự dùng INACTIVE.
+            },
+
+            inputProfile: {
+              full_name: tenant.full_name.trim(),
+              phone: tenant.phone.trim(),
+              identity_number:
+                tenant.identity_number.trim() || null,
+              date_of_birth: tenant.date_of_birth || null,
+              province_code: tenant.province_code || null,
+              ward_code: tenant.ward_code || null,
+              address_detail:
+                tenant.address_detail.trim() || null,
+            },
+          };
+        }),
+
+        deposit: {
+          initial_amount: Number(deposit.initial_amount),
+          status: deposit.status,
+          received_date:
+            deposit.status === "RECEIVED"
+              ? deposit.received_date || null
+              : null,
+          note: deposit.note.trim() || null,
+        },
+      };
+
+      const response = await fetch(
+        "/api/landlord/rental_contracts",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const result: ApiResponse<unknown> = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Không thể tạo hợp đồng.",
+        );
+      }
+
+      toast.success("Hợp đồng đã được lưu ở bản nháp");
+
+      // Tải lại danh sách phòng để cập nhật dữ liệu mới nhất.
+      await getAllRoom();
+    } catch (err) {
+      console.error("Lỗi tạo hợp đồng:", err);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Đã xảy ra lỗi khi tạo hợp đồng.";
+
+      setStepError(message);
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ----------------------------------------------------------
+  // RENDER LOADING / ERROR
+  // ----------------------------------------------------------
 
   if (loading) {
-    return <p>Đang tải danh sách phòng...</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Đang tải danh sách phòng...
+      </p>
+    );
   }
 
   if (error) {
-    return <p className="text-red-500">{error}</p>;
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-red-500">{error}</p>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={getAllRoom}
+        >
+          Thử lại
+        </Button>
+      </div>
+    );
   }
 
-  return (
-    <div className="space-y-4">
-      <StepSelectRoom
-        rooms={availableRooms}
-        selectedRoomId={selectedRoomId}
-        onSelectRoom={handleSelectRoom}
-      />
+  // ----------------------------------------------------------
+  // RENDER
+  // ----------------------------------------------------------
 
-      {/* Tạm thời kiểm tra phòng đã chọn */}
-      {selectedRoom && <p>Phòng đã chọn: {selectedRoom.room_number}</p>}
+  return (
+    <div className="space-y-6">
+      {/* STEP INDICATOR */}
+
+      <Card className="p-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {STEPS.map((step) => {
+            const isActive = currentStep === step.id;
+            const isCompleted = currentStep > step.id;
+
+            return (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => {
+                  if (step.id < currentStep && !submitting) {
+                    setCurrentStep(step.id);
+                    setStepError("");
+                  }
+                }}
+                disabled={step.id > currentStep || submitting}
+                className="flex min-w-0 items-center gap-2 text-left disabled:cursor-not-allowed"
+              >
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition-colors ${
+                    isCompleted
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : isActive
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-muted bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {isCompleted ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    step.id
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <p
+                    className={`truncate text-sm font-semibold ${
+                      isActive
+                        ? "text-primary"
+                        : "text-foreground"
+                    }`}
+                  >
+                    {step.title}
+                  </p>
+
+                  <p className="hidden truncate text-xs text-muted-foreground sm:block">
+                    {step.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* STEP 1: CHỌN PHÒNG */}
+
+      {currentStep === 1 && (
+        <StepSelectRoom
+          rooms={availableRooms}
+          selectedRoomId={selectedRoomId}
+          onSelectRoom={handleSelectRoom}
+        />
+      )}
+
+      {/* STEP 2: NGƯỜI THUÊ */}
+
+      {currentStep === 2 && (
+        <StepTenants
+          tenants={tenants}
+          onAddTenant={handleAddTenant}
+          onRemoveTenant={handleRemoveTenant}
+          onTenantChange={handleTenantChange}
+          onSetRepresentative={handleSetRepresentative}
+        />
+      )}
+
+      {/* STEP 3: HỢP ĐỒNG */}
+
+      {currentStep === 3 && (
+        <StepContractInfo
+          contract={contract}
+          selectedRoom={selectedRoom}
+          onContractChange={setContract}
+          onChangeRoom={handleChangeRoom}
+        />
+      )}
+
+      {/* STEP 4: TIỀN CỌC VÀ XÁC NHẬN */}
+
+      {currentStep === 4 && (
+        <StepDepositSummary
+          deposit={deposit}
+          contract={contract}
+          tenants={tenants}
+          selectedRoom={selectedRoom}
+          onDepositChange={setDeposit}
+          onGoToStep={setCurrentStep}
+        />
+      )}
+
+      {/* VALIDATION ERROR */}
+
+      {stepError && (
+        <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {stepError}
+        </p>
+      )}
+
+      {/* NAVIGATION BUTTONS */}
+
+      <div className="flex items-center justify-between gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handlePreviousStep}
+          disabled={currentStep === 1 || submitting}
+        >
+          <ChevronLeft className="mr-2 h-4 w-4" />
+          Quay lại
+        </Button>
+
+        {currentStep < 4 ? (
+          <Button
+            type="button"
+            onClick={handleNextStep}
+            disabled={submitting}
+          >
+            Tiếp tục
+            <ChevronRight className="ml-2 h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <>
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                Hoàn tất
+                <Check className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

@@ -27,6 +27,12 @@ export const profileRepository = {
               },
             },
             {
+              phone: {
+                contains: keyword,
+                mode: "insensitive",
+              }
+            },
+            {
               identity_number: {
                 contains: keyword,
                 mode: "insensitive",

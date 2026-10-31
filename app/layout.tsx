@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Providers from "@/lib/components/Providers";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -11,7 +12,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers>{children}
+          <Toaster richColors position="top-right" />
+        </Providers>
       </body>
     </html>
   );

@@ -16,25 +16,16 @@ import { Separator } from "@/components/ui/separator";
 import type { RoomWithCurrentContract } from "@/lib/api/repositories/rooms/rooms.repository";
 import type { Decimal } from "@prisma/client/runtime/client";
 
-// ============================================================
-// TYPES
-// ============================================================
-
 type RoomStatus = "AVAILABLE" | "OCCUPIED" | "MAINTENANCE" | "INACTIVE";
 
-type ServiceType = "METERED" | "FIXED_PER_MONTH" | "FIXED_PER_HEAD";
 
 type StepSelectRoomProps = {
-  rooms: RoomWithCurrentContract[];
-  selectedRoomId: string | null;
-  onSelectRoom: (room: RoomWithCurrentContract) => void;
+  rooms: RoomWithCurrentContract[]; //Danh sách các phòng kèm theo thông tin chi tiết hợp đồng, dịch vụ, người thuê...
+  selectedRoomId: string | null; // Nhận id phòng đc chọn để hiển thị ra thông tin sau khi chọn
+  onSelectRoom: (room: RoomWithCurrentContract) => void; //Khi chọn sẽ gọi hàm set selectRoomId
 };
 
-// ============================================================
-// HELPERS
-// ============================================================
-
-const format = {
+export const formatRoom = {
   serviceType: (type: string) => {
     const types: Record<string, string> = {
       METERED: "Theo chỉ số",
@@ -91,20 +82,17 @@ function getServiceIcon(name: string) {
   return <House className="h-5 w-5" />;
 }
 
-// ============================================================
-// COMPONENT
-// ============================================================
 
 export default function StepSelectRoom({
   rooms,
   selectedRoomId,
   onSelectRoom,
 }: StepSelectRoomProps) {
-  const selectedRoom = rooms.find((room) => String(room.id) === selectedRoomId);
+  const selectedRoom = rooms.find((room) => String(room.id) === selectedRoomId); //Tìm phòng đc chọn: duyệt mảng rooms tìm phòng có id đc chọn 
   const roomItems = rooms.map((room) => ({
-    label: `${room.room_number} — ${format.currency(room.listed_rent)}/tháng`,
+    label: `${room.room_number} — ${formatRoom.currency(room.listed_rent)}/tháng`,
     value: String(room.id),
-  }));
+  })); //Item để hiển thị lên select
 
   return (
     <Card>
@@ -199,7 +187,7 @@ export default function StepSelectRoom({
                 </div>
 
                 <p className="mt-2 text-lg font-semibold">
-                  {format.currency(selectedRoom.listed_rent)}
+                  {formatRoom.currency(selectedRoom.listed_rent)}
                 </p>
               </div>
             </div>
@@ -236,14 +224,14 @@ export default function StepSelectRoom({
                             <p className="font-medium">{service.name}</p>
 
                             <p className="text-sm text-muted-foreground">
-                              {format.serviceType(roomService.services.type)}
+                              {formatRoom.serviceType(roomService.services.type)}
                             </p>
                           </div>
                         </div>
 
                         <div className="sm:text-right">
                           <p className="font-semibold">
-                            {format.currency(
+                            {formatRoom.currency(
                               roomService.services.default_unit_price,
                             )}
                           </p>

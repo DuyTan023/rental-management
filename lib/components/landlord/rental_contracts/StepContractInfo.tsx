@@ -15,8 +15,10 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { RoomWithCurrentContract } from "@/lib/api/repositories/rooms/rooms.repository";
+import { formatRoom } from "./StepSelectRoom";
 
-import type { RoomOption } from "./StepSelectRoom";
+
 
 // ============================================================
 // TYPES
@@ -33,7 +35,7 @@ export type RentalContractFormData = {
 
 type StepContractInfoProps = {
   contract: RentalContractFormData;
-  selectedRoom?: RoomOption;
+  selectedRoom?: RoomWithCurrentContract;
   onContractChange: (
     value:
       | RentalContractFormData
@@ -45,6 +47,18 @@ type StepContractInfoProps = {
 // ============================================================
 // HELPER
 // ============================================================
+
+export function generateContractNumber(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  const dd = pad(date.getDate());
+  const mm = pad(date.getMonth() + 1);
+  const yy = String(date.getFullYear()).slice(-2);
+  const hh = pad(date.getHours());
+  const pp = pad(date.getMinutes());
+
+  return `HD${dd}${mm}${yy}${hh}${pp}`;
+}
 
 function formatCurrency(value: number | string) {
   return new Intl.NumberFormat("vi-VN", {
@@ -73,7 +87,7 @@ export default function StepContractInfo({
         </CardTitle>
 
         <p className="text-sm text-muted-foreground">
-          Nhập thời hạn, tiền thuê và ngày thanh toán của hợp đồng.
+          Kiểm tra mã hợp đồng, thời hạn, tiền thuê và ngày thanh toán.
         </p>
       </CardHeader>
 
@@ -81,23 +95,16 @@ export default function StepContractInfo({
         {/* Mã hợp đồng */}
 
         <div className="space-y-2">
-          <Label>
-            Mã hợp đồng <span className="text-red-500">*</span>
-          </Label>
+          <Label>Mã hợp đồng</Label>
 
           <Input
-            placeholder="Ví dụ: HD3010260001"
             value={contract.contract_number}
-            onChange={(e) =>
-              onContractChange((prev) => ({
-                ...prev,
-                contract_number: e.target.value,
-              }))
-            }
+            readOnly
+            className="bg-muted font-medium"
           />
 
           <p className="text-xs text-muted-foreground">
-            Mã hợp đồng phải duy nhất trong database.
+            Mã được tự động tạo theo định dạng HDddmmyyhhpp.
           </p>
         </div>
 
@@ -105,37 +112,47 @@ export default function StepContractInfo({
 
         {/* Phòng đã chọn */}
 
-        {selectedRoom && (
-          <div className="rounded-lg border bg-muted/20 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <House className="h-5 w-5" />
+        <div className="space-y-3">
+          <h3 className="font-semibold">Phòng thuê</h3>
+
+          {selectedRoom ? (
+            <div className="rounded-lg border bg-muted/20 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <House className="h-5 w-5" />
+                  </div>
+
+                  <div>
+                    <p className="font-semibold">
+                      Phòng {selectedRoom.room_number}
+                    </p>
+
+                    <p className="text-sm text-muted-foreground">
+                      {formatRoom.currency(selectedRoom.area)} m² · Tối đa{" "}
+                      {selectedRoom.max_occupants} người
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <p className="font-semibold">
-                    Phòng {selectedRoom.room_number}
-                  </p>
-
-                  <p className="text-sm text-muted-foreground">
-                    {selectedRoom.area} m² · Tối đa {selectedRoom.max_occupants}{" "}
-                    người
-                  </p>
-                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onChangeRoom}
+                >
+                  Đổi phòng
+                </Button>
               </div>
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onChangeRoom}
-              >
-                Đổi phòng
-              </Button>
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-sm text-destructive">
+              Chưa có phòng được chọn. Vui lòng quay lại bước chọn phòng.
+            </p>
+          )}
+        </div>
+
+        <Separator />
 
         {/* Thời hạn hợp đồng */}
 
@@ -155,6 +172,10 @@ export default function StepContractInfo({
                   onContractChange((prev) => ({
                     ...prev,
                     start_date: e.target.value,
+                    end_date:
+                      prev.end_date && prev.end_date < e.target.value
+                        ? ""
+                        : prev.end_date,
                   }))
                 }
               />
@@ -176,7 +197,7 @@ export default function StepContractInfo({
               />
 
               <p className="text-xs text-muted-foreground">
-                Có thể để trống nếu chưa xác định ngày kết thúc.
+                Có thể để trống nếu hợp đồng chưa xác định ngày kết thúc.
               </p>
             </div>
           </div>
@@ -216,7 +237,7 @@ export default function StepContractInfo({
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Giá này được lưu vào rental_contracts.rent_price.
+                Giá thuê được lưu vào rental_contracts.rent_price.
               </p>
             </div>
 
@@ -225,13 +246,12 @@ export default function StepContractInfo({
                 Ngày thanh toán hàng tháng{" "}
                 <span className="text-red-500">*</span>
               </Label>
-
               <Select
                 value={contract.billing_day}
                 onValueChange={(value) =>
                   onContractChange((prev) => ({
                     ...prev,
-                    billing_day: value,
+                    billing_day: value ?? "",
                   }))
                 }
               >
@@ -240,18 +260,16 @@ export default function StepContractInfo({
                 </SelectTrigger>
 
                 <SelectContent>
-                  {Array.from({ length: 28 }, (_, index) => index + 1).map(
-                    (day) => (
-                      <SelectItem key={day} value={String(day)}>
-                        Ngày {day} hàng tháng
-                      </SelectItem>
-                    ),
-                  )}
+                  {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+                    <SelectItem key={day} value={String(day)}>
+                      Ngày {day} hàng tháng
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
               <p className="text-xs text-muted-foreground">
-                Tương ứng với rental_contracts.billing_day.
+                Ngày thanh toán được lưu vào rental_contracts.billing_day.
               </p>
             </div>
           </div>

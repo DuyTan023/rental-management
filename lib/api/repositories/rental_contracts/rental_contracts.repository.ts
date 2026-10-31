@@ -1,4 +1,5 @@
 import {
+  contract_deposits,
   contract_tenants,
   Prisma,
   rental_contract_status,
@@ -52,7 +53,11 @@ export type TenantItemInput = {
 // Kiểu dữ liệu đầu vào khi tạo mới hợp đòng : thông tin cần có hợp đồng, mảng các đối tượng TenantItemInput chứa thông tin của N người thuê phòng tham gia vào hợp đồng này
 export type CreateFullContractParams = {
   inputRentalContract: Prisma.rental_contractsUncheckedCreateInput;
-  tenants: TenantItemInput[]; // Danh sách N người thuê
+  tenants: TenantItemInput[];
+  deposit: {
+    initial_amount: number;
+    note?: string | null;
+  };
 };
 
 // Type dữ liệu một hợp đồng kèm phòng và người thuê
@@ -65,6 +70,19 @@ export type RentalContractWithDetails =
           profiles: true;
         };
       };
+    };
+  }>;
+
+  export type RentalContractWithDetailV2 =
+  Prisma.rental_contractsGetPayload<{
+    include: {
+      rooms: true;
+      contract_tenants: {
+        include: {
+          profiles: true;
+        };
+      };
+      contract_deposits: true
     };
   }>;
 
@@ -221,7 +239,7 @@ export const rentalContractRepository = {
   },
 
   // Tìm theo ID
-  findById: async (id: bigint): Promise<RentalContractWithDetails | null> => {
+  findById: async (id: bigint): Promise<RentalContractWithDetailV2 | null> => {
     return prisma.rental_contracts.findUnique({
       where: { id },
       include: {
@@ -235,84 +253,140 @@ export const rentalContractRepository = {
             },
           },
         },
+        contract_deposits: true,
       },
     });
   },
 
+
   // Tạo mới 1 hợp đồng
-  createRentalContracts: async ({
-    inputRentalContract,
-    tenants,
-  }: CreateFullContractParams): Promise<{
-    rental_contract: rental_contracts;
-    contract_tenants: contract_tenants[];
-  }> => {
-    return await prisma.$transaction(async (tx) => {
-      // Tạo hợp đồng thuê
-      const rental_contract = await tx.rental_contracts.create({
-        data: inputRentalContract,
-      });
+createRentalContracts: async ({
+  inputRentalContract,
+  tenants,
+  deposit,
+}: CreateFullContractParams): Promise<{
+  rental_contract: rental_contracts;
+  contract_tenants: contract_tenants[];
+  contract_deposit: contract_deposits;
+}> => {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Tạo hợp đồng thuê
+    const rental_contract = await tx.rental_contracts.create({
+      data: {
+        ...inputRentalContract,
+        room_id: BigInt(inputRentalContract.room_id),
+        start_date: new Date(inputRentalContract.start_date),
+        end_date: inputRentalContract.end_date
+          ? new Date(inputRentalContract.end_date)
+          : null,
+        status: "DRAFT",
+      },
+    });
 
-      const createdContractTenants: contract_tenants[] = [];
+    const createdContractTenants: contract_tenants[] = [];
 
-      // Duyệt danh sách người thuê
-      for (const [index, tenantItem] of tenants.entries()) {
-        let targetProfileId: bigint;
+    // 2. Tạo danh sách người thuê
+    for (const tenantItem of tenants) {
+      let targetProfileId: bigint;
 
-        if (tenantItem.profile_id) {
-          // TH 1: Khách cũ -> Sử dụng profile_id có sẵn
-          targetProfileId = BigInt(tenantItem.profile_id);
-        } else if (tenantItem.inputUser && tenantItem.inputProfile) {
-          // TH 2: Khách mới -> Tạo User
-          const user = await tx.users.create({
-            data: tenantItem.inputUser,
-          });
+      if (tenantItem.profile_id) {
+        // Khách cũ: sử dụng profile_id có sẵn
+        targetProfileId = BigInt(tenantItem.profile_id);
+      } else if (tenantItem.inputUser && tenantItem.inputProfile) {
+        // Khách mới: tạo User
+        const user = await tx.users.create({
+          data: tenantItem.inputUser,
+        });
 
-          // Tạo Profile và liên kết với User
-          const profile = await tx.profiles.create({
-            data: {
-              ...tenantItem.inputProfile,
-              users: {
-                connect: { id: user.id },
-              },
-            },
-          });
-
-          targetProfileId = profile.id;
-        } else {
-          throw new Error(
-            "Mỗi khách thuê phải có profile_id (khách cũ) hoặc đủ thông tin User và Profile (khách mới).",
-          );
-        }
-
-        //Tạo liên kết người thuê với hợp đồng
-        const contract_tenant = await tx.contract_tenants.create({
+        // Tạo Profile và liên kết với User
+        const profile = await tx.profiles.create({
           data: {
-            contract_id: rental_contract.id,
-            profile_id: targetProfileId,
-            joined_at: tenantItem.joined_at
-              ? new Date(tenantItem.joined_at)
-              : new Date(),
-            role: index === 0 ? "REPRESENTATIVE" : "MEMBER",
+            ...tenantItem.inputProfile,
+            date_of_birth: tenantItem.inputProfile.date_of_birth
+              ? new Date(tenantItem.inputProfile.date_of_birth)
+              : null,
+            users: {
+              connect: { id: user.id },
+            },
           },
         });
 
-        createdContractTenants.push(contract_tenant);
+        targetProfileId = profile.id;
+      } else {
+        throw new Error(
+          "Mỗi khách thuê phải có profile_id hoặc đủ thông tin User và Profile.",
+        );
       }
 
-      // Trả kết quả
-      return {
-        rental_contract,
-        contract_tenants: createdContractTenants,
-      };
-    });
-  },
+      // Tạo liên kết người thuê với hợp đồng
+      const contract_tenant = await tx.contract_tenants.create({
+        data: {
+          contract_id: rental_contract.id,
+          profile_id: targetProfileId,
+          joined_at: tenantItem.joined_at
+            ? new Date(tenantItem.joined_at)
+            : new Date(),
+          role: tenantItem.is_representative
+            ? "REPRESENTATIVE"
+            : "MEMBER",
+          status: "ACTIVE",
+        },
+      });
 
-  updateRentalContract: async (
-    id: bigint,
-    input: Prisma.rental_contractsUpdateInput,
-  ): Promise<RentalContractWithDetails> => {
-    return prisma.rental_contracts.update({
+      createdContractTenants.push(contract_tenant);
+    }
+
+    // 3. Tạo khoản tiền cọc ban đầu
+    // Luôn ở trạng thái NOT_RECEIVED
+    const contract_deposit = await tx.contract_deposits.create({
+      data: {
+        contract_id: rental_contract.id,
+        initial_amount: deposit.initial_amount,
+        status: "NOT_RECEIVED",
+        received_date: null,
+        note: deposit.note || null,
+      },
+    });
+
+    // 4. Trả kết quả
+    return {
+      rental_contract,
+      contract_tenants: createdContractTenants,
+      contract_deposit,
+    };
+  });
+},
+
+  // updateRentalContract: async (
+  //   id: bigint,
+  //   input: Prisma.rental_contractsUpdateInput,
+  // ): Promise<RentalContractWithDetails> => {
+  //   return prisma.rental_contracts.update({
+  //     where: { id },
+  //     data: input,
+  //     include: {
+  //       rooms: true,
+  //       contract_tenants: {
+  //         include: {
+  //           profiles: true,
+  //         }
+  //       }
+  //     }
+  //   });
+  // },
+
+updateRentalContract: async (
+  id: bigint,
+  input: Prisma.rental_contractsUpdateInput,
+  depositData?: Prisma.contract_depositsUpdateInput,
+  transactionData?: Omit<
+    Prisma.deposit_transactionsUncheckedCreateInput,
+    "contract_deposit_id"
+  >,
+): Promise<RentalContractWithDetails> => {
+  return prisma.$transaction(async (tx) => {
+    // 1. Cập nhật trạng thái hợp đồng
+    const updatedContract = await tx.rental_contracts.update({
       where: { id },
       data: input,
       include: {
@@ -320,11 +394,40 @@ export const rentalContractRepository = {
         contract_tenants: {
           include: {
             profiles: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
-  },
+
+    // 2. Tìm thông tin tiền cọc của hợp đồng
+    const depositContract = await tx.contract_deposits.findFirst({
+      where: {
+        contract_id: updatedContract.id,
+      },
+    });
+
+    // 3. Cập nhật trạng thái tiền cọc
+    if (depositData && depositContract) {
+      await tx.contract_deposits.update({
+        where: {
+          id: depositContract.id,
+        },
+        data: depositData,
+      });
+    }
+
+   // 4. Tạo lịch sử giao dịch tiền cọc
+      if (transactionData && depositContract) {
+        await tx.deposit_transactions.create({
+          data: {
+            ...transactionData,
+            contract_deposit_id: depositContract.id,
+          },
+        });
+      }
+    return updatedContract;
+  });
+},
 
   deleteRentalContract: async (id: bigint): Promise<rental_contracts> => {
     return prisma.rental_contracts.delete({

@@ -1,25 +1,38 @@
+
 "use client";
 
 import {
-  CheckCircle2,
   ClipboardList,
   House,
-  Info,
   UserRound,
   Wallet,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import type { RentalContractFormData } from "./StepContractInfo";
-import type { RoomOption } from "./StepSelectRoom";
+
 import type { TenantFormData } from "./StepTenants";
+import { RoomWithCurrentContract } from "@/lib/api/repositories/rooms/rooms.repository";
+import { Decimal } from "@prisma/client/runtime/client";
 
 // ============================================================
 // TYPES
@@ -27,6 +40,7 @@ import type { TenantFormData } from "./StepTenants";
 
 export type DepositFormData = {
   initial_amount: string;
+  status: "NOT_RECEIVED" | "RECEIVED";
   received_date: string;
   note: string;
 };
@@ -35,9 +49,11 @@ type StepDepositSummaryProps = {
   deposit: DepositFormData;
   contract: RentalContractFormData;
   tenants: TenantFormData[];
-  selectedRoom?: RoomOption;
+  selectedRoom?: RoomWithCurrentContract;
   onDepositChange: (
-    value: DepositFormData | ((prev: DepositFormData) => DepositFormData),
+    value:
+      | DepositFormData
+      | ((prev: DepositFormData) => DepositFormData),
   ) => void;
   onGoToStep: (step: number) => void;
 };
@@ -46,23 +62,46 @@ type StepDepositSummaryProps = {
 // HELPERS
 // ============================================================
 
-function formatCurrency(value: number | string) {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
-}
+export const formatRoom = {
+  serviceType: (type: string) => {
+    const types: Record<string, string> = {
+      METERED: "Theo chỉ số",
+      FIXED_PER_MONTH: "Theo tháng",
+      FIXED_PER_HEAD: "Theo đầu người",
+    };
 
-function formatDate(value: string) {
-  if (!value) return "Chưa chọn";
+    return types[type] ?? type;
+  },
 
-  const date = new Date(`${value}T00:00:00`);
+  // Format giá tiền
+  currency: (price: Decimal | number | string) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    }).format(Number(price));
+  },
 
-  if (Number.isNaN(date.getTime())) return value;
+  // Format thời gian
+  date: (date: Date | string | null) => {
+    if (!date) return "—";
 
-  return new Intl.DateTimeFormat("vi-VN").format(date);
-}
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) return "—";
+
+    return new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(parsedDate);
+  },
+};
+
 
 // ============================================================
 // COMPONENT
@@ -79,30 +118,41 @@ export default function StepDepositSummary({
   const rentPrice = Number(contract.rent_price) || 0;
   const depositAmount = Number(deposit.initial_amount) || 0;
 
-  const totalExpected = rentPrice + depositAmount;
+  const isReceived = deposit.status === "RECEIVED";
+
+  const handleDepositStatusChange = (
+    value: "NOT_RECEIVED" | "RECEIVED",
+  ) => {
+    onDepositChange((prev) => ({
+      ...prev,
+      status: value,
+      received_date:
+        value === "NOT_RECEIVED" ? "" : prev.received_date,
+    }));
+  };
 
   return (
     <div className="space-y-5">
-      {/* ======================================================
-          THÔNG TIN TIỀN CỌC
-      ====================================================== */}
+      {/* TIỀN CỌC */}
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Wallet className="h-5 w-5" />
-            4. Thông tin tiền cọc
+            4. Xác nhận tiền cọc
           </CardTitle>
 
           <p className="text-sm text-muted-foreground">
-            Nhập số tiền cọc thỏa thuận khi tạo hợp đồng.
+            Nhập số tiền cọc theo thỏa thuận và xác nhận tình trạng nhận cọc.
           </p>
         </CardHeader>
 
         <CardContent className="space-y-5">
+          {/* Số tiền cọc */}
+
           <div className="space-y-2">
             <Label>
-              Số tiền cọc ban đầu <span className="text-red-500">*</span>
+              Số tiền cọc <span className="text-red-500">*</span>
             </Label>
 
             <div className="relative">
@@ -125,36 +175,74 @@ export default function StepDepositSummary({
               </span>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Tương ứng với contract_deposits.initial_amount.
+            <p className="text-sm font-medium text-primary">
+              {formatRoom.currency(depositAmount)}
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label>Ngày nhận tiền cọc</Label>
+          {/* Trạng thái nhận cọc */}
 
-            <Input
-              type="date"
-              value={deposit.received_date}
-              onChange={(e) =>
-                onDepositChange((prev) => ({
-                  ...prev,
-                  received_date: e.target.value,
-                }))
+          <div className="space-y-2">
+            <Label>
+              Trạng thái tiền cọc <span className="text-red-500">*</span>
+            </Label>
+
+            <Select
+              value={deposit.status}
+              onValueChange={(value) =>
+                handleDepositStatusChange(
+                  (value ?? "NOT_RECEIVED") as
+                    | "NOT_RECEIVED"
+                    | "RECEIVED",
+                )
               }
-            />
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Chọn trạng thái" />
+              </SelectTrigger>
 
-            <p className="text-xs text-muted-foreground">
-              Để trống nếu chưa nhận tiền cọc.
-            </p>
+              <SelectContent>
+                <SelectItem value="NOT_RECEIVED">
+                  Chưa nhận tiền cọc
+                </SelectItem>
+
+                <SelectItem value="RECEIVED">
+                  Đã nhận tiền cọc
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
+          {/* Ngày nhận cọc */}
+
+          {isReceived && (
+            <div className="space-y-2">
+              <Label>
+                Ngày nhận tiền cọc{" "}
+                <span className="text-red-500">*</span>
+              </Label>
+
+              <Input
+                type="date"
+                value={deposit.received_date}
+                onChange={(e) =>
+                  onDepositChange((prev) => ({
+                    ...prev,
+                    received_date: e.target.value,
+                  }))
+                }
+              />
+            </div>
+          )}
+
+          {/* Ghi chú */}
+
           <div className="space-y-2">
-            <Label>Ghi chú tiền cọc</Label>
+            <Label>Ghi chú</Label>
 
             <Textarea
               rows={3}
-              placeholder="Ví dụ: Hẹn nhận tiền cọc khi bàn giao phòng..."
+              placeholder="Ví dụ: Khách hẹn chuyển khoản tiền cọc vào ngày mai..."
               value={deposit.note}
               onChange={(e) =>
                 onDepositChange((prev) => ({
@@ -165,29 +253,15 @@ export default function StepDepositSummary({
             />
           </div>
 
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-start gap-2">
-              <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-
-              <div>
-                <p className="font-semibold text-amber-900">
-                  Lưu ý về tiền cọc
-                </p>
-
-                <p className="mt-1 text-sm text-amber-800">
-                  Số tiền cọc ban đầu không đồng nghĩa với số tiền đã nhận. Khi
-                  kết nối API, cần xác định trạng thái cọc và giao dịch thu tiền
-                  phù hợp với thực tế.
-                </p>
-              </div>
-            </div>
+          <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+            {isReceived
+              ? "Tiền cọc được đánh dấu đã nhận. Vui lòng nhập ngày nhận tiền thực tế."
+              : "Tiền cọc chưa được nhận. Hệ thống sẽ lưu trạng thái chờ nhận cọc."}
           </div>
         </CardContent>
       </Card>
 
-      {/* ======================================================
-          XÁC NHẬN HỢP ĐỒNG
-      ====================================================== */}
+      {/* XÁC NHẬN THÔNG TIN */}
 
       <Card>
         <CardHeader>
@@ -197,12 +271,12 @@ export default function StepDepositSummary({
           </CardTitle>
 
           <p className="text-sm text-muted-foreground">
-            Kiểm tra lại các thông tin đã nhập trước khi tạo hợp đồng.
+            Kiểm tra lại thông tin trước khi tạo hợp đồng.
           </p>
         </CardHeader>
 
         <CardContent className="space-y-5">
-          {/* Phòng cho thuê */}
+          {/* PHÒNG */}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -220,38 +294,37 @@ export default function StepDepositSummary({
               </Button>
             </div>
 
-            <div className="rounded-lg border p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <House className="h-5 w-5" />
-                </div>
+            <div className="flex items-center gap-3 rounded-lg border p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <House className="h-5 w-5" />
+              </div>
 
-                <div className="min-w-0">
-                  <p className="font-semibold">
-                    {selectedRoom
-                      ? `Phòng ${selectedRoom.room_number}`
-                      : "Chưa chọn phòng"}
-                  </p>
+              <div>
+                <p className="font-semibold">
+                  {selectedRoom
+                    ? `Phòng ${selectedRoom.room_number}`
+                    : "Chưa chọn phòng"}
+                </p>
 
-                  <p className="text-sm text-muted-foreground">
-                    {selectedRoom
-                      ? `${selectedRoom.area} m² · Tối đa ${selectedRoom.max_occupants} người`
-                      : "Vui lòng quay lại chọn phòng"}
-                  </p>
-
-                  {selectedRoom && (
-                    <p className="mt-1 font-medium text-primary">
-                      {formatCurrency(selectedRoom.listed_rent)}/tháng
+                {selectedRoom && (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      {formatRoom.currency(selectedRoom.area)} m² · Tối đa{" "}
+                      {selectedRoom.max_occupants} người
                     </p>
-                  )}
-                </div>
+
+                    <p className="mt-1 font-medium text-primary">
+                      {formatRoom.currency(selectedRoom.listed_rent)}/tháng
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
           <Separator />
 
-          {/* Người thuê */}
+          {/* NGƯỜI THUÊ */}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -275,7 +348,7 @@ export default function StepDepositSummary({
                   key={tenant.id}
                   className="flex items-center gap-3 rounded-lg border p-3"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
                     <UserRound className="h-4 w-4" />
                   </div>
 
@@ -291,7 +364,9 @@ export default function StepDepositSummary({
 
                   <Badge
                     variant={
-                      tenant.role === "REPRESENTATIVE" ? "default" : "secondary"
+                      tenant.role === "REPRESENTATIVE"
+                        ? "default"
+                        : "secondary"
                     }
                   >
                     {tenant.role === "REPRESENTATIVE"
@@ -305,7 +380,7 @@ export default function StepDepositSummary({
 
           <Separator />
 
-          {/* Thông tin hợp đồng */}
+          {/* HỢP ĐỒNG */}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -325,35 +400,39 @@ export default function StepDepositSummary({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-lg border p-3">
-                <p className="text-sm text-muted-foreground">Mã hợp đồng</p>
-
+                <p className="text-sm text-muted-foreground">
+                  Mã hợp đồng
+                </p>
                 <p className="mt-1 break-all font-semibold">
                   {contract.contract_number || "Chưa nhập"}
                 </p>
               </div>
 
               <div className="rounded-lg border p-3">
-                <p className="text-sm text-muted-foreground">Ngày thanh toán</p>
-
+                <p className="text-sm text-muted-foreground">
+                  Ngày thanh toán
+                </p>
                 <p className="mt-1 font-semibold">
                   Ngày {contract.billing_day || "—"} hàng tháng
                 </p>
               </div>
 
               <div className="rounded-lg border p-3">
-                <p className="text-sm text-muted-foreground">Ngày bắt đầu</p>
-
+                <p className="text-sm text-muted-foreground">
+                  Ngày bắt đầu
+                </p>
                 <p className="mt-1 font-semibold">
-                  {formatDate(contract.start_date)}
+                  {formatRoom.date(contract.start_date)}
                 </p>
               </div>
 
               <div className="rounded-lg border p-3">
-                <p className="text-sm text-muted-foreground">Ngày kết thúc</p>
-
+                <p className="text-sm text-muted-foreground">
+                  Ngày kết thúc
+                </p>
                 <p className="mt-1 font-semibold">
                   {contract.end_date
-                    ? formatDate(contract.end_date)
+                    ? formatRoom.date(contract.end_date)
                     : "Không xác định"}
                 </p>
               </div>
@@ -363,14 +442,14 @@ export default function StepDepositSummary({
               <p className="text-sm text-muted-foreground">
                 Tiền thuê mỗi tháng
               </p>
-
-              <p className="mt-1 font-semibold">{formatCurrency(rentPrice)}</p>
+              <p className="mt-1 font-semibold">
+                {formatRoom.currency(rentPrice)}
+              </p>
             </div>
 
             {contract.note && (
               <div className="rounded-lg border p-3">
                 <p className="text-sm text-muted-foreground">Ghi chú</p>
-
                 <p className="mt-1 whitespace-pre-wrap text-sm">
                   {contract.note}
                 </p>
@@ -380,11 +459,11 @@ export default function StepDepositSummary({
 
           <Separator />
 
-          {/* Tổng kết tài chính */}
+          {/* TỔNG KẾT */}
 
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground">
-              TỔNG KẾT TÀI CHÍNH
+              TỔNG KẾT TIỀN
             </h3>
 
             <div className="rounded-xl border bg-muted/20 p-4">
@@ -392,48 +471,48 @@ export default function StepDepositSummary({
                 <span className="text-sm text-muted-foreground">
                   Tiền thuê mỗi tháng
                 </span>
-
                 <span className="font-semibold">
-                  {formatCurrency(rentPrice)}
+                  {formatRoom.currency(rentPrice)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-3 py-2">
                 <span className="text-sm text-muted-foreground">
-                  Tiền cọc ban đầu
+                  Tiền cọc thỏa thuận
                 </span>
-
                 <span className="font-semibold">
-                  {formatCurrency(depositAmount)}
+                  {formatRoom.currency(depositAmount)}
                 </span>
               </div>
 
               <Separator className="my-2" />
 
               <div className="flex items-center justify-between gap-3 py-2">
-                <div>
-                  <p className="font-semibold">Tổng tiền dự kiến</p>
+                <span className="font-semibold">Trạng thái tiền cọc</span>
 
-                  <p className="text-xs text-muted-foreground">
-                    Tiền thuê tháng đầu + tiền cọc
-                  </p>
-                </div>
-
-                <p className="text-lg font-bold text-primary">
-                  {formatCurrency(totalExpected)}
-                </p>
+                <Badge
+                  variant={isReceived ? "default" : "secondary"}
+                >
+                  {isReceived ? "Đã nhận" : "Chưa nhận"}
+                </Badge>
               </div>
-            </div>
 
-            <p className="text-xs text-muted-foreground">
-              Tổng tiền trên chỉ mang tính tham khảo, chưa bao gồm phí dịch vụ
-              hoặc các khoản thu khác.
-            </p>
+              {isReceived && deposit.received_date && (
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <span className="text-sm text-muted-foreground">
+                    Ngày nhận cọc
+                  </span>
+                  <span className="text-sm font-medium">
+                    {formatRoom.date(deposit.received_date)}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Dịch vụ phòng */}
+          {/* DỊCH VỤ PHÒNG */}
 
-          {selectedRoom && selectedRoom.services.length > 0 && (
+          {selectedRoom && selectedRoom.room_services.length > 0 && (
             <>
               <Separator />
 
@@ -442,20 +521,20 @@ export default function StepDepositSummary({
                   DỊCH VỤ PHÒNG
                 </h3>
 
-                {selectedRoom.services.map((service) => (
+                {selectedRoom.room_services.map((service) => (
                   <div
                     key={service.id}
                     className="flex items-center justify-between gap-3 text-sm"
                   >
                     <span>
-                      {service.name}{" "}
+                      {service.services.name}{" "}
                       <span className="text-muted-foreground">
-                        ({service.unit})
+                        ({service.services.unit})
                       </span>
                     </span>
 
                     <span className="font-medium">
-                      {formatCurrency(service.unit_price)}
+                      {formatRoom.currency(service.services.default_unit_price)}
                     </span>
                   </div>
                 ))}
@@ -463,16 +542,9 @@ export default function StepDepositSummary({
             </>
           )}
 
-          {/* Lưu ý cuối */}
-
-          <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-
-            <p>
-              Vui lòng kiểm tra các thông tin trên. Khi triển khai thực tế, hệ
-              thống cần xác thực dữ liệu, trạng thái phòng, người thuê và các
-              ràng buộc hợp đồng trước khi lưu.
-            </p>
+          <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+            Vui lòng kiểm tra kỹ thông tin phòng, người thuê, hợp đồng và tiền
+            cọc trước khi tạo.
           </div>
         </CardContent>
       </Card>
