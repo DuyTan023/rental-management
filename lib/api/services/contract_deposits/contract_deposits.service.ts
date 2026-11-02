@@ -197,7 +197,7 @@ export const contractDepositService = {
           status: newStatus,
         },
         inputDepositTransaction: {
-          type: "REFUND",
+          type: "DEDUCT",
           amount,
           description: reason.trim(),
           ...(createdBy !== undefined
@@ -223,6 +223,7 @@ export const contractDepositService = {
       ) {
         throw error;
       }
+      console.error("deductDeposit error:", error);
       throw new Error("SERVER_ERROR");
     }
   },
@@ -294,6 +295,7 @@ export const contractDepositService = {
       ) {
         throw error;
       }
+      
       throw new Error("SERVER_ERROR");
     }
   },

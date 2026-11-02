@@ -1,11 +1,21 @@
+
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { CardSim, Clock, House, UsersRound, Wallet } from "lucide-react";
+import {
+  CardSim,
+  Clock,
+  House,
+  Search,
+  UsersRound,
+  Wallet,
+  X,
+} from "lucide-react";
 
 import type { RoomWithCurrentContract } from "@/lib/api/repositories/rooms/rooms.repository";
 import type { ApiResponse, PaginationResult } from "@/lib/types/api.type";
@@ -23,8 +33,12 @@ export default function Rooms() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("total");
 
+  // Tìm kiếm phòng
+  const [keyword, setKeyword] = useState("");
+  const [appliedKeyword, setAppliedKeyword] = useState("");
+
   // =========================
-  // LẤY TẤT CẢ PHÒNG
+  // LẤY DANH SÁCH PHÒNG
   // =========================
 
   const getAllRoom = useCallback(async () => {
@@ -39,19 +53,35 @@ export default function Rooms() {
       const allRooms: RoomWithCurrentContract[] = [];
 
       do {
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(limit),
+        });
+
+        if (appliedKeyword) {
+          params.set("keyword", appliedKeyword);
+        }
+
         const response = await fetch(
-          `/api/landlord/rooms?page=${page}&limit=${limit}`,
+          `/api/landlord/rooms?${params.toString()}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          },
         );
 
         if (!response.ok) {
           throw new Error("Không thể lấy danh sách phòng");
         }
 
-        const result: ApiResponse<PaginationResult<RoomWithCurrentContract>> =
-          await response.json();
+        const result: ApiResponse<
+          PaginationResult<RoomWithCurrentContract>
+        > = await response.json();
 
         if (!result.success || !result.data) {
-          throw new Error(result.message || "Lấy danh sách phòng thất bại");
+          throw new Error(
+            result.message || "Lấy danh sách phòng thất bại",
+          );
         }
 
         allRooms.push(...result.data.data);
@@ -64,6 +94,8 @@ export default function Rooms() {
     } catch (err) {
       console.error("Lỗi lấy danh sách phòng:", err);
 
+      setRooms([]);
+
       setError(
         err instanceof Error
           ? err.message
@@ -72,39 +104,52 @@ export default function Rooms() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [appliedKeyword]);
 
-  // Gọi API khi component được mount
+  // Gọi API khi mở trang hoặc khi từ khóa tìm kiếm thay đổi
   useEffect(() => {
     void getAllRoom();
   }, [getAllRoom]);
 
   // =========================
+  // XỬ LÝ TÌM KIẾM
+  // =========================
+
+  const handleSearch = () => {
+    setAppliedKeyword(keyword.trim());
+  };
+
+  const handleResetSearch = () => {
+    setKeyword("");
+    setAppliedKeyword("");
+  };
+
+  // =========================
   // TÍNH SỐ LƯỢNG PHÒNG
   // =========================
 
-  const totalRooms = rooms.length; // Tổng số lượng phòng
+  const totalRooms = rooms.length;
 
   const emptyRooms = rooms.filter(
-    // Phòng trống
     (room) => room.status === "AVAILABLE",
   ).length;
 
   const rentingRooms = rooms.filter(
-    // Phòng đang có người thuê (Phòng có ng thuê khác null) có thể tìm theo trạng thái
     (room) => room.current_contract !== null,
   ).length;
 
   const repairingRooms = rooms.filter(
-    // Phòng đang sử chữa bảo trì
     (room) => room.status === "MAINTENANCE",
   ).length;
 
-  // Tạm thời chưa xác định quy tắc cảnh báo từ nghiệp vụ.
   const warningRooms = rooms.filter(
-    // Phòng đang có người thuê
     (room) => room.status === "INACTIVE",
   ).length;
+
+  // =========================
+  // CẤU HÌNH CÁC TAB
+  // =========================
+
   const itemTabs = [
     {
       id: "total",
@@ -115,7 +160,6 @@ export default function Rooms() {
       iconBg: "bg-blue-200",
       textColor: "text-blue-600",
       detailColor: "text-blue-500",
-      // Sử dụng data-active thay vì data-selected
       activeRing:
         "data-active:ring-2 data-active:ring-blue-500 data-active:border-blue-500 data-active:bg-blue-100",
     },
@@ -141,7 +185,7 @@ export default function Rooms() {
       textColor: "text-orange-600",
       detailColor: "text-orange-500",
       activeRing:
-        "data-active:ring-2 data-active:ring-orange-500 data-active:border-orange-500, data-active:bg-orange-100",
+        "data-active:ring-2 data-active:ring-orange-500 data-active:border-orange-500 data-active:bg-orange-100",
     },
     {
       id: "repairing",
@@ -153,7 +197,7 @@ export default function Rooms() {
       textColor: "text-violet-600",
       detailColor: "text-violet-500",
       activeRing:
-        "data-active:ring-2 data-active:ring-violet-500 data-active:border-violet-500, data-active:bg-violet-100",
+        "data-active:ring-2 data-active:ring-violet-500 data-active:border-violet-500 data-active:bg-violet-100",
     },
     {
       id: "warning",
@@ -165,7 +209,7 @@ export default function Rooms() {
       textColor: "text-red-600",
       detailColor: "text-red-500",
       activeRing:
-        "data-active:ring-2 data-active:ring-red-500 data-active:border-red-500, data-active:bg-red-100",
+        "data-active:ring-2 data-active:ring-red-500 data-active:border-red-500 data-active:bg-red-100",
     },
   ] as const;
 
@@ -177,25 +221,72 @@ export default function Rooms() {
     warning: Warning,
   };
 
+  // =========================
+  // GIAO DIỆN
+  // =========================
+
   return (
-    <div className="flex flex-col p-3 sm:p-4 md:p-5 gap-y-4">
+    <div className="flex flex-col gap-y-4 p-3 sm:p-4 md:p-5">
       <div className="flex flex-col gap-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-black text-lg md:text-xl font-bold">
+        {/* Tiêu đề */}
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-lg font-bold text-black md:text-xl">
             Xin Chào, Kẻ thống trị
           </h1>
+
           <FormCreateRoom
             onSuccess={() => {
               void getAllRoom();
             }}
             trigger={
-              <Button className="bg-blue-600 text-white font-bold hover:bg-blue-500">
+              <Button className="bg-blue-600 font-bold text-white hover:bg-blue-500">
                 + Thêm phòng
               </Button>
             }
           />
         </div>
 
+        {/* Thanh tìm kiếm */}
+        <form
+          className="flex flex-col gap-2 sm:flex-row"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleSearch();
+          }}
+        >
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+
+            <Input
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="Tìm kiếm theo mã phòng..."
+              className="h-10 bg-white pl-9"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            className="h-10 bg-blue-600 font-bold text-white hover:bg-blue-500"
+          >
+            <Search className="mr-2 size-4" />
+            Tìm kiếm
+          </Button>
+
+          {(keyword || appliedKeyword) && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10"
+              onClick={handleResetSearch}
+            >
+              <X className="mr-2 size-4" />
+              Xóa tìm kiếm
+            </Button>
+          )}
+        </form>
+
+        {/* Các thẻ thống kê và danh sách phòng */}
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -204,34 +295,41 @@ export default function Rooms() {
           <TabsList className="grid h-auto w-full grid-cols-2 items-stretch gap-2 bg-transparent p-0 md:grid-cols-5">
             {itemTabs.map((item) => {
               const Icon = item.icon;
+
               return (
                 <TabsTrigger
                   key={item.id}
                   value={item.id}
                   className={`
                     ${item.cardBg} ${item.activeRing}
-                    flex items-center rounded-xl border border-transparent p-2 gap-2
-                    transition-all duration-200 cursor-pointer
-                    data-selected:bg-white data-[state=active]:bg-white
-                    data-selected:shadow-md data-[state=active]:shadow-md
-                    data-selected:scale-[1.02] data-[state=active]:scale-[1.02]
+                    flex cursor-pointer items-center gap-2 rounded-xl
+                    border border-transparent p-2
+                    transition-all duration-200
+                    data-selected:bg-white
+                    data-[state=active]:bg-white
+                    data-selected:shadow-md
+                    data-[state=active]:shadow-md
+                    data-selected:scale-[1.02]
+                    data-[state=active]:scale-[1.02]
                   `}
                 >
                   <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-xl shrink-0 ${item.iconBg}`}
+                    className={`flex size-8 shrink-0 items-center justify-center rounded-xl ${item.iconBg}`}
                   >
                     <Icon size={18} className={item.textColor} />
                   </div>
 
-                  <div className="flex flex-col items-start flex-1 min-w-0">
-                    <p className="text-[10px] sm:text-xs text-gray-700 truncate">
+                  <div className="flex min-w-0 flex-1 flex-col items-start">
+                    <p className="truncate text-[10px] text-gray-700 sm:text-xs">
                       {item.title}
                     </p>
-                    <p className="font-bold text-lg leading-5">
-                      {item.value.toString()}
+
+                    <p className="text-lg font-bold leading-5">
+                      {item.value}
                     </p>
                   </div>
-                  <p className={`text-[9px] shrink-0 ${item.detailColor}`}>
+
+                  <p className={`shrink-0 text-[9px] ${item.detailColor}`}>
                     Chi tiết
                   </p>
                 </TabsTrigger>
@@ -255,11 +353,15 @@ export default function Rooms() {
                     Đang tải dữ liệu...
                   </div>
                 ) : error ? (
-                  <div className="rounded-xl border bg-white p-6 text-center text-sm text-gray-500">
-                    Không thể hiển thị danh sách phòng.
+                  <div className="rounded-xl border bg-white p-6 text-center text-sm text-red-600">
+                    {error}
                   </div>
                 ) : (
-                  <TabComponent rooms={rooms} loading={loading} error={error} />
+                  <TabComponent
+                    rooms={rooms}
+                    loading={loading}
+                    error={error}
+                  />
                 )}
               </TabsContent>
             );

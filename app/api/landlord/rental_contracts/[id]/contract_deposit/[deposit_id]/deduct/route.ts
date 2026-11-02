@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import {
   contractDepositService,
   type deductDepositInput,
@@ -31,6 +32,7 @@ export async function PUT(req: NextRequest, { params }: routeDepoistContext) {
     const input: deductDepositInput = {
       ...body,
       id,
+      amount: new Prisma.Decimal(body.amount),
     };
 
     const contract_deposit = await contractDepositService.deductDeposit(input);

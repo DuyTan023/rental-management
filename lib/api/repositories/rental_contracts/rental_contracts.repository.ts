@@ -82,7 +82,11 @@ export type RentalContractWithDetails =
           profiles: true;
         };
       };
-      contract_deposits: true
+      contract_deposits: {
+        include: {
+          deposit_transactions: true;
+        }
+      }
     };
   }>;
 
@@ -253,7 +257,15 @@ export const rentalContractRepository = {
             },
           },
         },
-        contract_deposits: true,
+        contract_deposits: {
+          include: {
+            deposit_transactions: {
+              orderBy: {
+                transaction_date: "asc",
+              },
+            },
+          }
+        }
       },
     });
   },

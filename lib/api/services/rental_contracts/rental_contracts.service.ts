@@ -90,70 +90,12 @@ export const rentalContractService = {
     }
   },
 
-  // updateRentalContract: async (
-  //   id: bigint,
-  //   input: Prisma.rental_contractsUpdateInput,
-  // ): Promise<RentalContractWithDetails> => {
-  //   try {
-  //     return await rentalContractRepository.updateRentalContract(id, input);
-  //   } catch (error) {
-  //     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-  //       // lỗi trung lặp
-  //       if (error.code === "P2002") {
-  //         throw new Error("RENTAL_CONTRACT_EXISTS");
-  //       }
-
-  //       // lỗi không tìm thấy hợp đồng cần update
-  //       if (error.code === "P2025") {
-  //         throw new Error("RENTAL_CONTRACT_NOT_FOUND");
-  //       }
-  //     }
-  //     throw new Error("SERVER_ERROR");
-  //   }
-  // },
-
-
-//   updateRentalContract: async (
-//   id: bigint,
-//   input: Prisma.rental_contractsUpdateInput,
-//   transactionData?: Prisma.deposit_transactionsUncheckedCreateInput,
-// ): Promise<RentalContractWithDetails> => {
-//   try {
-//     return await rentalContractRepository.updateRentalContract(
-//       id,
-//       input,
-//       transactionData,
-//     );
-//   } catch (error) {
-//     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-//       // Lỗi trùng lặp
-//       if (error.code === "P2002") {
-//         throw new Error("RENTAL_CONTRACT_EXISTS");
-//       }
-
-//       // Không tìm thấy hợp đồng hoặc bản ghi liên quan
-//       if (error.code === "P2025") {
-//         throw new Error("RENTAL_CONTRACT_NOT_FOUND");
-//       }
-
-//       // Lỗi khóa ngoại
-//       if (error.code === "P2003") {
-//         throw new Error("INVALID_RELATED_RECORD");
-//       }
-//     }
-
-//     console.error("updateRentalContract error:", error);
-//     throw new Error("SERVER_ERROR");
-//   }
-// },
-
-
 updateRentalContract: async (
   id: bigint,
   newStatus: rental_contract_status,
 ): Promise<RentalContractWithDetails> => {
   try {
-    // 1. Lấy thông tin hợp đồng hiện tại
+    // 1. Lấy hợp đồng hiện tại cùng tiền cọc và lịch sử giao dịch.
     const contract = await rentalContractRepository.findById(id);
 
     if (!contract) {
@@ -162,10 +104,24 @@ updateRentalContract: async (
 
     const currentStatus = contract.status;
 
-    // 2. Kiểm tra trạng thái không thay đổi
     if (currentStatus === newStatus) {
       throw new Error("RENTAL_CONTRACT_STATUS_UNCHANGED");
     }
+
+    // 2. Chỉ cho phép các chuyển trạng thái được quy định.
+    const activating =
+      currentStatus === "DRAFT" && newStatus === "ACTIVE";
+
+    const terminating =
+      currentStatus === "ACTIVE" &&
+      (newStatus === "COMPLETED" ||
+        newStatus === "TERMINATED");
+
+    if (!activating && !terminating) {
+      throw new Error("INVALID_RENTAL_CONTRACT_TRANSITION");
+    }
+
+    const deposit = contract.contract_deposits[0];
 
     let depositData:
       | Prisma.contract_depositsUpdateInput
@@ -178,15 +134,9 @@ updateRentalContract: async (
         >
       | undefined;
 
-    // Lấy bản ghi tiền cọc
-    const deposit = contract.contract_deposits[0];
-
-    // 3. DRAFT -> ACTIVE: Ghi nhận thu tiền cọc
-    if (
-      currentStatus === "DRAFT" &&
-      newStatus === "ACTIVE"
-    ) {
-      if (deposit && Number(deposit.initial_amount) > 0) {
+    // 3. DRAFT -> ACTIVE: ghi nhận thu tiền cọc.
+    if (activating) {
+      if (deposit && deposit.initial_amount.gt(0)) {
         if (deposit.status !== "NOT_RECEIVED") {
           throw new Error("INVALID_DEPOSIT_STATUS");
         }
@@ -205,42 +155,139 @@ updateRentalContract: async (
     }
 
     // 4. ACTIVE -> COMPLETED / TERMINATED:
-    // Chỉ kết thúc hợp đồng, không tự động quyết toán tiền cọc
-    else if (
-      currentStatus === "ACTIVE" &&
-      (newStatus === "COMPLETED" ||
-        newStatus === "TERMINATED")
-    ) {
-      // Không cập nhật khoản cọc tại đây.
-      // Chờ chức năng quyết toán tiền cọc riêng.
+    // Quyết toán dựa trên lịch sử giao dịch tiền cọc.
+    if (terminating && deposit) {
+      const transactions = deposit.deposit_transactions;
+
+      const zero = new Prisma.Decimal(0);
+
+      let collected = zero;
+      let refunded = zero;
+      let deducted = zero;
+      let adjustments = zero;
+
+      for (const transaction of transactions) {
+        const amount = new Prisma.Decimal(transaction.amount);
+
+        switch (transaction.type) {
+          case "COLLECT":
+            collected = collected.plus(amount);
+            break;
+
+          case "REFUND":
+            refunded = refunded.plus(amount);
+            break;
+
+          case "DEDUCT":
+            deducted = deducted.plus(amount);
+            break;
+
+          case "ADJUSTMENT":
+            // Quy ước: số dương tăng cọc, số âm giảm cọc.
+            adjustments = adjustments.plus(amount);
+            break;
+        }
+      }
+
+      // Không quyết toán một khoản cọc chưa từng được thu.
+      if (
+        deposit.status === "NOT_RECEIVED" &&
+        deposit.initial_amount.gt(0)
+      ) {
+        throw new Error("INVALID_DEPOSIT_STATUS");
+      }
+
+      // Tổng số tiền thực tế còn lại.
+      const balance = collected
+        .minus(refunded)
+        .minus(deducted)
+        .plus(adjustments);
+
+      if (balance.lt(0)) {
+        throw new Error("INVALID_DEPOSIT_BALANCE");
+      }
+
+      // Kiểm tra tính hợp lệ của lịch sử trước khi quyết toán.
+      if (
+        refunded.gt(collected.plus(adjustments)) ||
+        deducted.gt(collected.plus(adjustments))
+      ) {
+        throw new Error("INVALID_DEPOSIT_BALANCE");
+      }
+
+      // Không cho phép xử lý lại khoản cọc đã quyết toán.
+      if (
+        ["REFUNDED", "FULLY_DEDUCTED", "SETTLED"].includes(
+          deposit.status,
+        )
+      ) {
+        if (!balance.isZero()) {
+          throw new Error("INVALID_DEPOSIT_STATUS");
+        }
+
+        throw new Error("DEPOSIT_ALREADY_SETTLED");
+      }
+
+      // Số dư dương: hoàn lại toàn bộ số dư còn lại.
+      if (balance.gt(0)) {
+        transactionData = {
+          type: "REFUND",
+          amount: balance,
+          description: "Hoàn tiền cọc khi kết thúc hợp đồng",
+        };
+      }
+
+      // Cập nhật số liệu tổng hợp từ lịch sử giao dịch.
+      const totalRefunded = refunded.plus(balance);
+      const totalDeducted = deducted;
+
+      let finalDepositStatus:
+        | "REFUNDED"
+        | "PARTIALLY_DEDUCTED"
+        | "FULLY_DEDUCTED"
+        | "SETTLED";
+
+      if (totalDeducted.gt(0) && balance.gt(0)) {
+        finalDepositStatus = "PARTIALLY_DEDUCTED";
+      } else if (totalDeducted.gt(0)) {
+        finalDepositStatus = "FULLY_DEDUCTED";
+      } else if (balance.gt(0)) {
+        finalDepositStatus = "REFUNDED";
+      } else {
+        finalDepositStatus = "SETTLED";
+      }
+
+      depositData = {
+        refunded_amount: totalRefunded,
+        deducted_amount: totalDeducted,
+        status: finalDepositStatus,
+        settled_date: new Date(),
+      };
     }
 
-    // 5. Các trạng thái chuyển đổi không hợp lệ
-    else {
-      throw new Error("INVALID_RENTAL_CONTRACT_TRANSITION");
-    }
-
-    // 6. Cập nhật hợp đồng và tiền cọc
+    // 5. Cập nhật hợp đồng, tiền cọc và giao dịch.
+    // Repository sẽ thực hiện các thao tác ghi trong transaction.
     return await rentalContractRepository.updateRentalContract(
       id,
-      {
-        status: newStatus,
-      },
+      { status: newStatus },
       depositData,
       transactionData,
     );
   } catch (error) {
-    if (
-      error instanceof Error &&
-      [
+    if (error instanceof Error) {
+      const knownErrors = [
         "RENTAL_CONTRACT_NOT_FOUND",
         "RENTAL_CONTRACT_STATUS_UNCHANGED",
         "INVALID_RENTAL_CONTRACT_TRANSITION",
         "INVALID_DEPOSIT_STATUS",
+        "INVALID_DEPOSIT_BALANCE",
+        "DEPOSIT_ALREADY_SETTLED",
         "CONTRACT_DEPOSIT_NOT_FOUND",
-      ].includes(error.message)
-    ) {
-      throw error;
+      ];
+
+      if (knownErrors.includes(error.message)) {
+        throw error;
+      }
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -257,6 +304,7 @@ updateRentalContract: async (
     throw new Error("SERVER_ERROR");
   }
 },
+
   deleteRentalContract: async (id: bigint): Promise<rental_contracts> => {
     try {
       return await rentalContractRepository.deleteRentalContract(id);
