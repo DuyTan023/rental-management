@@ -19,17 +19,17 @@ export type ProfileWithUserV2 = Prisma.profilesGetPayload<{
     contract_tenants: {
       where: {
         rental_contracts: {
-          status: "ACTIVE",
-        }
-      },
+          status: "ACTIVE";
+        };
+      };
       include: {
         rental_contracts: {
           include: {
-            rooms: true,
-          }
-        },
-      }
-    }
+            rooms: true;
+          };
+        };
+      };
+    };
   };
 }>;
 
@@ -56,7 +56,7 @@ export const profileRepository = {
               phone: {
                 contains: keyword,
                 mode: "insensitive",
-              }
+              },
             },
             {
               identity_number: {
@@ -97,26 +97,26 @@ export const profileRepository = {
   // Tìm người dùng theo id
   findById: async (id: bigint): Promise<ProfileWithUserV2 | null> => {
     return prisma.profiles.findUnique({
-      where: {id},
+      where: { id },
       include: {
         users: true,
         contract_tenants: {
           where: {
             rental_contracts: {
-              status: "ACTIVE"
-            }
+              status: "ACTIVE",
+            },
           },
           include: {
             rental_contracts: {
               include: {
                 rooms: true,
-              }
+              },
             },
-          }     
-        }
-      }
+          },
+        },
+      },
     });
-},
+  },
 
   findByUserId: async (userId: bigint): Promise<ProfileWithUser | null> => {
     return prisma.profiles.findUnique({
@@ -125,7 +125,7 @@ export const profileRepository = {
       },
       include: {
         users: true,
-      }
+      },
     });
   },
 
@@ -175,7 +175,7 @@ export const profileRepository = {
     });
   },
 
-  // Cập nhật trạng thái tài khoản, thay đổi password, cạp nhật các thông tin cần thiết
+  // Cập nhật trạng thái tài khoản, thay đổi password, cạp nhật các thông tin cần thiết, khóa tài khoản (cập nhật status  = lock)
   updateUser: async (
     id: bigint,
     input: Prisma.usersUpdateInput,

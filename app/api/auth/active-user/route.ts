@@ -3,11 +3,7 @@
 import { account_status } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendActiveUser } from "@/lib/types/email";
-import {
-  apiErrorResponse,
-  apiSuccessResponse,
-  serverErrorResponse,
-} from "@/lib/utils/api-error";
+import { apiErrorResponse, apiSuccessResponse } from "@/lib/utils/api-error";
 import { parseId } from "@/lib/utils/function";
 import { createHash, randomBytes } from "crypto";
 import type { NextRequest } from "next/server";
@@ -76,7 +72,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Tạo link kích hoạt
-    const activationLink = `${process.env.NEXT_PUBLIC_APP_URL}/public/auth/activate?token=${token}`;
+    const activationLink = `${process.env.APP_URL}/public/auth/activate?token=${token}`;
 
     // Gửi email
     await sendActiveUser(user.email, activationLink);
@@ -89,8 +85,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     // console.error("Lỗi khi tạo lời mời kích hoạt:", error);
     // return serverErrorResponse();
-    const message =
-      error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
 
     console.error("[active-user API] Lỗi:", error);
 

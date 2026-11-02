@@ -1,57 +1,42 @@
-
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   ArrowLeft,
-  UserRound,
-  Mail,
-  Phone,
-  CreditCard,
   CalendarDays,
-  MapPin,
-  House,
-  FileText,
-  Users,
-  Clock,
   CircleCheck,
-  CircleX,
+  Clock,
+  CreditCard,
+  Loader2,
   LoaderCircle,
   Lock,
-  Loader2,
+  Mail,
+  MapPin,
+  Phone,
+  Unlock,
+  UserRound,
 } from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ProfileWithUserV2 } from "@/lib/api/repositories/profiles/profiles.repository";
 import {
   getProvinces,
   getWards,
   type Province,
   type Ward,
 } from "@/lib/utils/administrative-units";
-import { ProfileWithUserV2 } from "@/lib/api/repositories/profiles/profiles.repository";
 import { Decimal } from "@prisma/client/runtime/client";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "Chưa cập nhật";
-
-  return new Date(value).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-};
-
-const formatMoney = (value?: string | number | null) => {
-  if (value === null || value === undefined || value === "") {
-    return "Chưa cập nhật";
-  }
-
-  return `${Number(value).toLocaleString("vi-VN")} đ`;
-};
 
 const format = {
   serviceType: (type: string) => {
@@ -72,42 +57,22 @@ const format = {
     }).format(Number(price));
   },
 
-    date: (date: Date | string | null) => {
+  date: (date: Date | string | null) => {
     if (!date) return "Chưa cập nhật";
 
     return new Intl.DateTimeFormat("vi-VN", {
-        timeZone: "Asia/Ho_Chi_Minh",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
+      timeZone: "Asia/Ho_Chi_Minh",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     }).format(new Date(date));
-    },
-};
-
-const roomStatusLabels: Record<string, string> = {
-  AVAILABLE: "Phòng trống",
-  OCCUPIED: "Đang cho thuê",
-  MAINTENANCE: "Đang sửa chữa",
-  INACTIVE: "Ngừng hoạt động",
-};
-
-const contractStatusLabels: Record<string, string> = {
-  DRAFT: "Bản nháp",
-  ACTIVE: "Đang hiệu lực",
-  EXPIRED: "Đã hết hạn",
-  TERMINATED: "Đã chấm dứt",
-  COMPLETED: "Đã hoàn thành",
+  },
 };
 
 const accountStatusLabels: Record<string, string> = {
   ACTIVE: "Đã kích hoạt",
   INACTIVE: "Chưa kích hoạt",
   LOCKED: "Đã khóa",
-};
-
-const tenantRoleLabels: Record<string, string> = {
-  REPRESENTATIVE: "Người đại diện hợp đồng",
-  MEMBER: "Thành viên hợp đồng",
 };
 
 function StatusBadge({
@@ -120,9 +85,7 @@ function StatusBadge({
   const color =
     status === "ACTIVE" || status === "AVAILABLE"
       ? "bg-green-50 text-green-700 ring-green-600/20"
-      : status === "OCCUPIED" ||
-          status === "EXPIRED" ||
-          status === "INACTIVE"
+      : status === "OCCUPIED" || status === "EXPIRED" || status === "INACTIVE"
         ? "bg-orange-50 text-orange-700 ring-orange-600/20"
         : status === "LOCKED" ||
             status === "TERMINATED" ||
@@ -203,6 +166,14 @@ export default function TenantProfileDetailPage() {
   const [wards, setWards] = useState<Ward[]>([]);
 
   const [sendingActivation, setSendingActivation] = useState(false);
+
+  type ConfirmAction = "ACTIVATE_EMAIL" | "LOCK" | "UNLOCK";
+
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(
+    null,
+  );
+
+  const [processingStatus, setProcessingStatus] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -314,9 +285,8 @@ export default function TenantProfileDetailPage() {
   }
 
   const provinceName =
-    provinces.find(
-      (item) => item.code === Number(profile.province_code),
-    )?.name ?? (profile.province_code ? "Chưa xác định" : "Chưa cập nhật");
+    provinces.find((item) => item.code === Number(profile.province_code))
+      ?.name ?? (profile.province_code ? "Chưa xác định" : "Chưa cập nhật");
 
   const wardName =
     wards.find((item) => item.code === Number(profile.ward_code))?.name ??
@@ -325,14 +295,12 @@ export default function TenantProfileDetailPage() {
   // Hợp đồng còn hiệu lực và người thuê vẫn đang tham gia.
   const activeTenantContracts = profile.contract_tenants.filter(
     (item) =>
-      item.status === "ACTIVE" &&
-      item.rental_contracts?.status === "ACTIVE",
+      item.status === "ACTIVE" && item.rental_contracts?.status === "ACTIVE",
   );
 
   // Hiển thị toàn bộ hợp đồng được API trả về, bao gồm cả lịch sử.
   const contracts = [...profile.contract_tenants].sort(
-    (a, b) =>
-      new Date(b.joined_at).getTime() - new Date(a.joined_at).getTime(),
+    (a, b) => new Date(b.joined_at).getTime() - new Date(a.joined_at).getTime(),
   );
 
   const user = profile.users;
@@ -375,6 +343,96 @@ export default function TenantProfileDetailPage() {
     } finally {
       setSendingActivation(false);
     }
+  };
+
+  const handleToggleAccountStatus = async () => {
+    if (!user || processingStatus) return;
+
+    const nextStatus = user.status === "ACTIVE" ? "LOCKED" : "ACTIVE";
+
+    setProcessingStatus(true);
+
+    try {
+      const response = await fetch(`/api/landlord/profiles/user/${user.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || "Không thể cập nhật trạng thái tài khoản",
+        );
+      }
+
+      // Cập nhật trạng thái trên giao diện ngay sau khi API thành công.
+      setProfile((prev) => {
+        if (!prev || !prev.users) return prev;
+
+        return {
+          ...prev,
+          users: {
+            ...prev.users,
+            status: nextStatus,
+          },
+        };
+      });
+
+      toast.success(
+        nextStatus === "LOCKED"
+          ? "Khóa tài khoản thành công"
+          : "Mở khóa tài khoản thành công",
+      );
+
+      setConfirmAction(null);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi cập nhật tài khoản",
+      );
+    } finally {
+      setProcessingStatus(false);
+    }
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return;
+
+    if (confirmAction === "ACTIVATE_EMAIL") {
+      await handleSendActivationEmail();
+      setConfirmAction(null);
+      return;
+    }
+
+    await handleToggleAccountStatus();
+  };
+
+  const confirmDialogContent = {
+    ACTIVATE_EMAIL: {
+      title: "Gửi thư kích hoạt?",
+      description:
+        "Bạn có chắc chắn muốn gửi email kích hoạt tài khoản đến người thuê này không?",
+      confirmText: "Gửi thư kích hoạt",
+    },
+    LOCK: {
+      title: "Khóa tài khoản?",
+      description:
+        "Người thuê sẽ không thể đăng nhập khi tài khoản bị khóa. Bạn có chắc chắn muốn tiếp tục?",
+      confirmText: "Khóa tài khoản",
+    },
+    UNLOCK: {
+      title: "Mở khóa tài khoản?",
+      description:
+        "Bạn có chắc chắn muốn mở khóa tài khoản này và cho phép người thuê đăng nhập trở lại?",
+      confirmText: "Mở khóa tài khoản",
+    },
   };
 
   return (
@@ -450,21 +508,31 @@ export default function TenantProfileDetailPage() {
             <div className="flex gap-2">
               <div className="rounded-xl bg-blue-50 p-3">
                 <p className="text-xs text-blue-700">Hợp đồng đang thuê</p>
-                <Link href={`/landlord/rental_contracts/${profile.contract_tenants[0].rental_contracts.id}`} className="hover:underline decoration-blue-600">
-                    <p className="mt-1 text-2xl font-bold text-blue-900">
-                        {profile.contract_tenants[0].rental_contracts.contract_number}
-                    </p>
+                <Link
+                  href={`/landlord/rental_contracts/${profile.contract_tenants[0].rental_contracts.id}`}
+                  className="hover:underline decoration-blue-600"
+                >
+                  <p className="mt-1 text-2xl font-bold text-blue-900">
+                    {
+                      profile.contract_tenants[0].rental_contracts
+                        .contract_number
+                    }
+                  </p>
                 </Link>
-                
               </div>
               <div className="rounded-xl bg-violet-50 p-3">
                 <p className="text-xs text-violet-500">Phòng đang ở</p>
-                <Link href={`/landlord/rooms/${profile.contract_tenants[0].rental_contracts.rooms.id}`} className="hover:underline decoration-violet-600">
-                <p className="mt-1 text-2xl font-bold text-violet-900">
-                  {profile.contract_tenants[0].rental_contracts.rooms.room_number}
-                </p>
+                <Link
+                  href={`/landlord/rooms/${profile.contract_tenants[0].rental_contracts.rooms.id}`}
+                  className="hover:underline decoration-violet-600"
+                >
+                  <p className="mt-1 text-2xl font-bold text-violet-900">
+                    {
+                      profile.contract_tenants[0].rental_contracts.rooms
+                        .room_number
+                    }
+                  </p>
                 </Link>
-             
               </div>
             </div>
           </div>
@@ -498,10 +566,7 @@ export default function TenantProfileDetailPage() {
               icon={<Mail className="h-4 w-4" />}
               value={user?.email || "Chưa cập nhật"}
             />
-            <InfoItem
-              label="ID hồ sơ"
-              value={String(profile.id)}
-            />
+            <InfoItem label="ID hồ sơ" value={String(profile.id)} />
           </div>
 
           <div className="mt-6 border-t border-gray-100 pt-5">
@@ -514,10 +579,7 @@ export default function TenantProfileDetailPage() {
                 icon={<MapPin className="h-4 w-4" />}
                 value={provinceName}
               />
-              <InfoItem
-                label="Phường / Xã"
-                value={wardName}
-              />
+              <InfoItem label="Phường / Xã" value={wardName} />
               <div className="sm:col-span-2">
                 <InfoItem
                   label="Địa chỉ chi tiết"
@@ -528,315 +590,156 @@ export default function TenantProfileDetailPage() {
           </div>
         </SectionCard>
 
-    {/* Thông tin tài khoản */}
-    <SectionCard
-    title="Thông tin tài khoản"
-    description="Trạng thái và hoạt động của tài khoản liên kết."
-    icon={<Mail className="h-5 w-5" />}
-    >
-    {!user ? (
-        <p className="text-sm text-gray-500">
-        Hồ sơ này chưa liên kết với tài khoản người dùng.
-        </p>
-    ) : (
-        <div className="space-y-6">
-        <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-            <InfoItem label="Email đăng nhập" value={user.email} />
+        {/* Thông tin tài khoản */}
+        <SectionCard
+          title="Thông tin tài khoản"
+          description="Trạng thái và hoạt động của tài khoản liên kết."
+          icon={<Mail className="h-5 w-5" />}
+        >
+          {!user ? (
+            <p className="text-sm text-gray-500">
+              Hồ sơ này chưa liên kết với tài khoản người dùng.
+            </p>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                <InfoItem label="Email đăng nhập" value={user.email} />
 
-            <InfoItem
-            label="Vai trò"
-            value={
-                user.role === "TENANT"
-                ? "Người thuê"
-                : user.role === "LANDLORD"
-                    ? "Chủ trọ"
-                    : user.role
-            }
-            />
-
-            <InfoItem
-            label="Trạng thái tài khoản"
-            value={
-                <StatusBadge
-                status={user.status}
-                labels={accountStatusLabels}
+                <InfoItem
+                  label="Vai trò"
+                  value={
+                    user.role === "TENANT"
+                      ? "Người thuê"
+                      : user.role === "LANDLORD"
+                        ? "Chủ trọ"
+                        : user.role
+                  }
                 />
-            }
-            />
 
-            <InfoItem
-            label="Ngày kích hoạt"
-            icon={<CircleCheck className="h-4 w-4" />}
-            value={format.date(user.activated_at)}
-            />
+                <InfoItem
+                  label="Trạng thái tài khoản"
+                  value={
+                    <StatusBadge
+                      status={user.status}
+                      labels={accountStatusLabels}
+                    />
+                  }
+                />
 
-            <InfoItem
-            label="Đăng nhập gần nhất"
-            icon={<Clock className="h-4 w-4" />}
-            value={format.date(user.last_login_at)}
-            />
+                <InfoItem
+                  label="Ngày kích hoạt"
+                  icon={<CircleCheck className="h-4 w-4" />}
+                  value={format.date(user.activated_at)}
+                />
 
-            <InfoItem
-            label="Ngày tạo tài khoản"
-            value={format.date(user.created_at)}
-            />
-        </div>
+                <InfoItem
+                  label="Đăng nhập gần nhất"
+                  icon={<Clock className="h-4 w-4" />}
+                  value={format.date(user.last_login_at)}
+                />
 
-   {/* Thao tác tài khoản */}
-      <div className="flex justify-end border-t pt-4">
-        {user.status === "ACTIVE" ? (
-          <Button
-            type="button"
-            variant="destructive"
-            // onClick={handleLockAccount}
-          >
-            <Lock className="mr-2 h-4 w-4" />
-            Khóa tài khoản
-          </Button>
-        ) : user.status === "INACTIVE" ? (
-          <Button
-            type="button"
-            onClick={handleSendActivationEmail}
-            disabled={sendingActivation}
-          >
-            {sendingActivation ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang gửi...
-              </>
-            ) : (
-              <>
-                <Mail className="mr-2 h-4 w-4" />
-                Gửi thư kích hoạt
-              </>
-            )}
-          </Button>
-        ) : null}
-      </div>
-      </div>
-    )}
-    </SectionCard>
+                <InfoItem
+                  label="Ngày tạo tài khoản"
+                  value={format.date(user.created_at)}
+                />
+              </div>
 
-        {/* Phòng đang ở */}
-        {/* <SectionCard
-          title="Phòng đang ở"
-          description="Phòng gắn với các hợp đồng đang có hiệu lực của người thuê."
-          icon={<House className="h-5 w-5" />}
-        >
-          {activeTenantContracts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center">
-              <House className="mx-auto h-8 w-8 text-gray-400" />
-              <p className="mt-3 font-medium text-gray-700">
-                Người thuê hiện không có hợp đồng đang hiệu lực
-              </p>
-              <p className="mt-1 text-sm text-gray-500">
-                Khi có hợp đồng đang hiệu lực, thông tin phòng sẽ hiển thị tại đây.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {activeTenantContracts.map((tenantContract) => {
-                const contract = tenantContract.rental_contracts;
-                const room = contract.rooms;
-
-                return (
-                  <div
-                    key={String(tenantContract.id)}
-                    className="rounded-xl border border-gray-200 p-4 transition hover:border-blue-200 hover:shadow-sm"
+              {/* Thao tác tài khoản */}
+              <div className="flex justify-end border-t pt-4">
+                {user.status === "ACTIVE" ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setConfirmAction("LOCK")}
+                    disabled={processingStatus}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm text-gray-500">Số phòng</p>
-                        <h3 className="mt-1 text-xl font-bold text-gray-900">
-                          {room.room_number ?? "Chưa có thông tin phòng"}
-                        </h3>
-                      </div>
-                      {room?.status && (
-                        <StatusBadge
-                          status={room.status}
-                          labels={roomStatusLabels}
-                        />
-                      )}
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-4">
-                      <InfoItem
-                        label="Diện tích"
-                        value={room ? `${room.area} m²` : "Chưa cập nhật"}
-                      />
-                      <InfoItem
-                        label="Sức chứa tối đa"
-                        value={
-                          room ? `${room.max_occupants} người` : "Chưa cập nhật"
-                        }
-                      />
-                      <InfoItem
-                        label="Giá thuê theo hợp đồng"
-                        value={format.currency(contract.rent_price)}
-                      />
-                      <InfoItem
-                        label="Giá niêm yết"
-                        value={format.currency(room?.listed_rent)}
-                      />
-                    </div>
-
-                    <div className="mt-4 border-t border-gray-100 pt-4">
-                      <p className="text-sm text-gray-500">Mã hợp đồng</p>
-                      <p className="mt-1 font-semibold text-blue-700">
-                        {contract.contract_number}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {format.date(contract.start_date)} –{" "}
-                        {format.date(contract.end_date)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+                    <Lock className="mr-2 h-4 w-4" />
+                    Khóa tài khoản
+                  </Button>
+                ) : user.status === "INACTIVE" ? (
+                  <Button
+                    type="button"
+                    onClick={() => setConfirmAction("ACTIVATE_EMAIL")}
+                    disabled={sendingActivation}
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    Gửi thư kích hoạt
+                  </Button>
+                ) : user.status === "LOCKED" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setConfirmAction("UNLOCK")}
+                    disabled={processingStatus}
+                  >
+                    <Unlock className="mr-2 h-4 w-4" />
+                    Mở khóa tài khoản
+                  </Button>
+                ) : null}
+              </div>
             </div>
           )}
-        </SectionCard> */}
-
-        {/* Danh sách hợp đồng */}
-        {/* <SectionCard
-          title="Hợp đồng thuê"
-          description="Danh sách các hợp đồng mà người thuê tham gia, bao gồm cả lịch sử."
-          icon={<FileText className="h-5 w-5" />}
-        >
-          {contracts.length === 0 ? (
-            <div className="py-8 text-center">
-              <FileText className="mx-auto h-8 w-8 text-gray-400" />
-              <p className="mt-3 text-sm text-gray-500">
-                Người thuê chưa có hợp đồng nào.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {contracts.map((tenantContract) => {
-                const contract = tenantContract.rental_contracts;
-                const room = contract.rooms;
-
-                return (
-                  <div
-                    key={String(tenantContract.id)}
-                    className="rounded-xl border border-gray-200 p-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h3 className="font-bold text-gray-900">
-                          {contract.contract_number}
-                        </h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                          Phòng {room?.room_number ?? "Chưa xác định"}
-                        </p>
-                      </div>
-                      <StatusBadge
-                        status={contract.status}
-                        labels={contractStatusLabels}
-                      />
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <InfoItem
-                        label="Ngày bắt đầu"
-                        value={format.date(contract.start_date)}
-                      />
-                      <InfoItem
-                        label="Ngày kết thúc"
-                        value={format.date(contract.end_date)}
-                      />
-                      <InfoItem
-                        label="Giá thuê"
-                        value={format.currency(contract.rent_price)}
-                      />
-                      <InfoItem
-                        label="Ngày thanh toán"
-                        value={`Ngày ${contract.billing_day} hằng tháng`}
-                      />
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-1 gap-4 border-t border-gray-100 pt-4 sm:grid-cols-2">
-                      <InfoItem
-                        label="Vai trò trong hợp đồng"
-                        value={
-                          tenantRoleLabels[tenantContract.role] ??
-                          tenantContract.role
-                        }
-                      />
-                      <InfoItem
-                        label="Trạng thái tham gia"
-                        value={
-                          tenantContract.status === "ACTIVE" ? (
-                            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-700">
-                              <CircleCheck className="h-4 w-4" />
-                              Đang tham gia
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600">
-                              <CircleX className="h-4 w-4" />
-                              {tenantContract.status}
-                            </span>
-                          )
-                        }
-                      />
-                      <InfoItem
-                        label="Ngày tham gia"
-                        value={format.date(tenantContract.joined_at)}
-                      />
-                      <InfoItem
-                        label="Ngày rời hợp đồng"
-                        value={format.date(tenantContract.left_at)}
-                      />
-                    </div>
-
-                    {tenantContract.left_reason && (
-                      <div className="mt-4 rounded-lg bg-gray-50 p-3">
-                        <p className="text-sm text-gray-500">
-                          Lý do rời hợp đồng
-                        </p>
-                        <p className="mt-1 text-sm text-gray-800">
-                          {tenantContract.left_reason}
-                        </p>
-                      </div>
-                    )}
-
-                    {contract.note && (
-                      <div className="mt-4 rounded-lg bg-gray-50 p-3">
-                        <p className="text-sm text-gray-500">Ghi chú hợp đồng</p>
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">
-                          {contract.note}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </SectionCard> */}
-
-        {/* Thông tin bổ sung */}
-        {/* <SectionCard
-          title="Thông tin bổ sung"
-          description="Thông tin phục vụ việc quản lý người thuê."
-          icon={<Users className="h-5 w-5" />}
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <InfoItem
-              label="Số hợp đồng đã tham gia"
-              value={`${contracts.length} hợp đồng`}
-            />
-            <InfoItem
-              label="Số hợp đồng đang hiệu lực"
-              value={`${activeTenantContracts.length} hợp đồng`}
-            />
-          </div>
-        </SectionCard> */}
+        </SectionCard>
 
         <p className="pb-3 text-center text-xs text-gray-400">
-          Thông tin được hiển thị từ hồ sơ người thuê và dữ liệu liên kết trong hệ thống.
+          Thông tin được hiển thị từ hồ sơ người thuê và dữ liệu liên kết trong
+          hệ thống.
         </p>
       </div>
+
+      <Dialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !processingStatus && !sendingActivation) {
+            setConfirmAction(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmAction
+                ? confirmDialogContent[confirmAction].title
+                : "Xác nhận thao tác"}
+            </DialogTitle>
+
+            <DialogDescription>
+              {confirmAction
+                ? confirmDialogContent[confirmAction].description
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmAction(null)}
+              disabled={processingStatus || sendingActivation}
+            >
+              Hủy
+            </Button>
+
+            <Button
+              type="button"
+              variant={confirmAction === "LOCK" ? "destructive" : "default"}
+              onClick={handleConfirmAction}
+              disabled={processingStatus || sendingActivation}
+            >
+              {processingStatus || sendingActivation ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : confirmAction ? (
+                confirmDialogContent[confirmAction].confirmText
+              ) : (
+                "Xác nhận"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

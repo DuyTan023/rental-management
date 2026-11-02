@@ -33,6 +33,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
+        if (user.status !== "ACTIVE") {
+          return null;
+        }
+
         // Nếu user chưa có pass thì trả về null
         if (!user.password_hash) {
           return null;

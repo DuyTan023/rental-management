@@ -168,3 +168,67 @@ export async function POST(req: NextRequest) {
     return serverErrorResponse();
   }
 }
+
+export async function GET(req: NextRequest) {
+  try {
+    const token = req.nextUrl.searchParams.get("token")?.trim();
+
+    if (!token) {
+      return apiErrorResponse("Thiếu mã kích hoạt tài khoản", 400);
+    }
+
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+
+    const invitation = await prisma.invitations.findUnique({
+      where: {
+        token_hash: tokenHash,
+      },
+      include: {
+        users: {
+          include: {
+            profiles: true,
+          },
+        },
+      },
+    });
+
+    if (!invitation) {
+      return apiErrorResponse("Liên kết kích hoạt không hợp lệ", 400);
+    }
+
+    if (invitation.status !== invitation_status.PENDING) {
+      return apiErrorResponse(
+        "Lời mời đã được sử dụng hoặc không còn hiệu lực",
+        400,
+      );
+    }
+
+    if (invitation.expires_at <= new Date()) {
+      return apiErrorResponse(
+        "Lời mời đã hết hạn. Vui lòng yêu cầu gửi lại lời mời.",
+        400,
+      );
+    }
+
+    const user = invitation.users;
+
+    if (user.status === account_status.ACTIVE || user.password_hash !== null) {
+      return apiErrorResponse(
+        "Tài khoản đã được kích hoạt hoặc đã thiết lập mật khẩu",
+        400,
+      );
+    }
+
+    return apiSuccessResponse(
+      "Lời mời kích hoạt hợp lệ",
+      {
+        fullName: user.profiles?.full_name ?? "",
+        email: user.email,
+      },
+      200,
+    );
+  } catch (error) {
+    console.error("Lỗi kiểm tra lời mời kích hoạt:", error);
+    return serverErrorResponse();
+  }
+}
