@@ -1,4 +1,5 @@
 import type { profiles } from "@/generated/prisma/client";
+import { ProfileWithUser } from "@/lib/api/repositories/profiles/profiles.repository";
 import { profileService } from "@/lib/api/services/profiles/profile.service";
 import type { ApiResponse, PaginationResult } from "@/lib/types/api.type";
 import {
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
         : 10;
 
     const profiles = await profileService.getProfile({ page, limit, keyword });
-    return NextResponse.json<ApiResponse<PaginationResult<profiles>>>(
+    return NextResponse.json<ApiResponse<PaginationResult<ProfileWithUser>>>(
       {
         success: true,
         message: "Lấy danh sách người thuê thành công",

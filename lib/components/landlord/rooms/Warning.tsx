@@ -127,7 +127,7 @@ export default function Repairing({ rooms, loading, error }: WarningProps) {
                   const occupantCount =
                     room.current_contract?.contract_tenants.length ?? 0;
 
-                  const isMaintenance = room.status === "MAINTENANCE";
+                  const isMaintenance = room.status === "INACTIVE";
 
                   return (
                     <Card
@@ -143,14 +143,14 @@ export default function Repairing({ rooms, loading, error }: WarningProps) {
                           <span
                             className={`rounded-full px-2 py-1 text-[10px] font-medium ${
                               isMaintenance
-                                ? "bg-violet-50 text-violet-700"
+                                ? "bg-red-50 text-red-700"
                                 : isRenting
                                   ? "bg-orange-50 text-orange-700"
                                   : "bg-green-50 text-green-700"
                             }`}
                           >
                             {isMaintenance
-                              ? "Đang sửa chữa"
+                              ? "Ngừng hoạt động"
                               : isRenting
                                 ? "Đang cho thuê"
                                 : "Phòng trống"}

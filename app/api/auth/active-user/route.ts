@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Tạo link kích hoạt
-    const activationLink = `${process.env.NEXT_PUBLIC_APP_URL}/activate?token=${token}`;
+    const activationLink = `${process.env.NEXT_PUBLIC_APP_URL}/public/auth/activate?token=${token}`;
 
     // Gửi email
     await sendActiveUser(user.email, activationLink);
@@ -87,7 +87,19 @@ export async function POST(req: NextRequest) {
       200,
     );
   } catch (error) {
-    console.error("Lỗi khi tạo lời mời kích hoạt:", error);
-    return serverErrorResponse();
+    // console.error("Lỗi khi tạo lời mời kích hoạt:", error);
+    // return serverErrorResponse();
+    const message =
+      error instanceof Error ? error.message : String(error);
+
+    console.error("[active-user API] Lỗi:", error);
+
+    return Response.json(
+      {
+        success: false,
+        message,
+      },
+      { status: 500 },
+    );
   }
 }

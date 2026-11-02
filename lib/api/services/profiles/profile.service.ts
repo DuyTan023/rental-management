@@ -1,6 +1,7 @@
 import { Prisma, profiles, type users } from "@/generated/prisma/client";
 import type { PaginationResult } from "@/lib/types/api.type";
-import { profileRepository } from "../../repositories/profiles/profiles.repository";
+import { profileRepository, ProfileWithUser, ProfileWithUserV2 } from "../../repositories/profiles/profiles.repository";
+import { Profile } from "next-auth";
 
 type GetProfileParams = {
   page?: number;
@@ -13,7 +14,7 @@ export const profileService = {
     page = 1,
     limit = 10,
     keyword,
-  }: GetProfileParams): Promise<PaginationResult<profiles>> => {
+  }: GetProfileParams): Promise<PaginationResult<ProfileWithUser>> => {
     try {
       const { profiles, total } = await profileRepository.findMany({
         page,
@@ -33,7 +34,7 @@ export const profileService = {
     }
   },
 
-  getById: async (id: bigint): Promise<profiles> => {
+  getById: async (id: bigint): Promise<ProfileWithUserV2> => {
     try {
       const profile = await profileRepository.findById(id);
       if (!profile) throw new Error("PROFILE_NOT_FOUND");
@@ -47,7 +48,7 @@ export const profileService = {
     }
   },
 
-  getByUserId: async (userId: bigint): Promise<profiles> => {
+  getByUserId: async (userId: bigint): Promise<ProfileWithUser> => {
     try {
       const profile = await profileRepository.findByUserId(userId);
       if (!profile) throw new Error("PROFILE_NOT_FOUND");

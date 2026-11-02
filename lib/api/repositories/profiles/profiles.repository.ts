@@ -3,9 +3,35 @@ import { prisma } from "@/lib/prisma";
 import type { FindManyParams } from "@/lib/types/api.type";
 
 type FindManyResultProfile = {
-  profiles: profiles[];
+  profiles: ProfileWithUser[];
   total: number;
 };
+
+export type ProfileWithUser = Prisma.profilesGetPayload<{
+  include: {
+    users: true;
+  };
+}>;
+
+export type ProfileWithUserV2 = Prisma.profilesGetPayload<{
+  include: {
+    users: true;
+    contract_tenants: {
+      where: {
+        rental_contracts: {
+          status: "ACTIVE",
+        }
+      },
+      include: {
+        rental_contracts: {
+          include: {
+            rooms: true,
+          }
+        },
+      }
+    }
+  };
+}>;
 
 export const profileRepository = {
   // Lấy danh sách người thuê có phân trang
@@ -69,20 +95,37 @@ export const profileRepository = {
   },
 
   // Tìm người dùng theo id
-  findById: async (id: bigint): Promise<profiles | null> => {
+  findById: async (id: bigint): Promise<ProfileWithUserV2 | null> => {
     return prisma.profiles.findUnique({
-      where: { id },
+      where: {id},
       include: {
         users: true,
-      },
+        contract_tenants: {
+          where: {
+            rental_contracts: {
+              status: "ACTIVE"
+            }
+          },
+          include: {
+            rental_contracts: {
+              include: {
+                rooms: true,
+              }
+            },
+          }     
+        }
+      }
     });
-  },
+},
 
-  findByUserId: async (userId: bigint): Promise<profiles | null> => {
+  findByUserId: async (userId: bigint): Promise<ProfileWithUser | null> => {
     return prisma.profiles.findUnique({
       where: {
         user_id: userId,
       },
+      include: {
+        users: true,
+      }
     });
   },
 

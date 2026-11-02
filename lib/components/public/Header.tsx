@@ -40,7 +40,7 @@ export default function Header() {
 
   const menuItems = [
     { name: "Dashboard", href: "/landlord/dashboard" },
-    { name: "Người dùng", href: "/admin/users" },
+    { name: "Người dùng", href: "/landlord/profiles" },
     { name: "Phòng trọ", href: "/landlord/rooms" },
     { name: "Dịch vụ", href: "/landlord/services" },
     { name: "Hợp đồng", href: "/landlord/rental_contracts" },
