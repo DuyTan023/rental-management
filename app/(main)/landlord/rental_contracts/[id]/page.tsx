@@ -1,5 +1,6 @@
+import { ContractDetail } from "@/lib/components/landlord/rental_contracts/ContractDetail/ContractDetail";
 
-import { ContractDetail } from "@/lib/components/landlord/rental_contracts/ContractDetail.tsx";
+
 
 type PageProps = {
   params: Promise<{ id: string }>;

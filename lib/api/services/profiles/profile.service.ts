@@ -61,23 +61,39 @@ export const profileService = {
     }
   },
 
-  createProfile: async (
-    inputProfile: Prisma.profilesCreateInput,
-    inputUser: Prisma.usersCreateInput,
-  ): Promise<{ user: users; profile: profiles }> => {
-    try {
-      return await profileRepository.createProfile(inputProfile, inputUser);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        // lỗi trung lặp
-        if (error.code === "P2002") {
-          throw new Error("PROFILE_EXISTS");
+createProfile: async (
+  inputProfile: Prisma.profilesCreateInput,
+  inputUser: Prisma.usersCreateInput,
+): Promise<{ user: users; profile: profiles }> => {
+  try {
+    return await profileRepository.createProfile(
+      inputProfile,
+      inputUser,
+    );
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        const target = error.meta?.target;
+
+        if (
+          Array.isArray(target) &&
+          target.some((field) => String(field).includes("email"))
+        ) {
+          throw new Error("USER_EXISTS");
         }
+
+        throw new Error("PROFILE_EXISTS");
       }
 
-      throw new Error("SERVER_ERROR");
+      if (error.code === "P2003") {
+        throw new Error("INVALID_RELATION");
+      }
     }
-  },
+
+    console.error("profileService.createProfile error:", error);
+    throw error;
+  }
+},
 
   updateProfile: async (
     id: bigint,

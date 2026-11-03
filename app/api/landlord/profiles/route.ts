@@ -42,11 +42,82 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const profile = await profileService.createProfile(body.profile, body.user);
-    return apiSuccessResponse("Tạo mới ngời thuê thành công", profile, 201);
-  } catch (err) {
-    if (err instanceof Error && err.message === "PROFILE_EXISTS") {
-      return apiErrorResponse("Người thuê đã tồn tại", 409);
+
+    if (!body?.profile || !body?.user) {
+      return apiErrorResponse(
+        "Vui lòng cung cấp thông tin tài khoản và hồ sơ người thuê.",
+        400,
+      );
+    }
+
+    // Chuẩn hóa ngày sinh trước khi gửi cho Prisma.
+    const rawDate = body.profile.date_of_birth;
+    let dateOfBirth: Date | null = null;
+
+    if (rawDate !== null && rawDate !== undefined && rawDate !== "") {
+      if (
+        typeof rawDate !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+      ) {
+        return apiErrorResponse("Ngày sinh không hợp lệ.", 400);
+      }
+
+      const [year, month, day] = rawDate.split("-").map(Number);
+      const parsedDate = new Date(Date.UTC(year, month - 1, day));
+
+      // Kiểm tra ngày thực tế, ví dụ không chấp nhận 2003-02-31.
+      if (
+        parsedDate.getUTCFullYear() !== year ||
+        parsedDate.getUTCMonth() !== month - 1 ||
+        parsedDate.getUTCDate() !== day
+      ) {
+        return apiErrorResponse("Ngày sinh không hợp lệ.", 400);
+      }
+
+      dateOfBirth = parsedDate;
+    }
+
+    const profileData = {
+      ...body.profile,
+      date_of_birth: dateOfBirth,
+    };
+
+    const result = await profileService.createProfile(
+      profileData,
+      body.user,
+    );
+
+    return apiSuccessResponse(
+      "Tạo mới người thuê thành công.",
+      serializeBigInt(result),
+      201,
+    );
+  } catch (error) {
+    console.error("POST /api/landlord/profiles error:", error);
+
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+
+      switch (error.message) {
+        case "PROFILE_EXISTS":
+          return apiErrorResponse(
+            "Thông tin hồ sơ đã tồn tại.",
+            409,
+          );
+
+        case "USER_EXISTS":
+          return apiErrorResponse(
+            "Email tài khoản đã được sử dụng.",
+            409,
+          );
+
+        case "INVALID_RELATION":
+          return apiErrorResponse(
+            "Dữ liệu liên kết không hợp lệ.",
+            400,
+          );
+      }
     }
 
     return serverErrorResponse();

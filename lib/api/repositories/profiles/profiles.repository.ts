@@ -131,14 +131,19 @@ export const profileRepository = {
 
   // Thêm mới 1 ng thuê + tạo ngay tài khoản ở trạng thái chưa kích hoạt
 
-  createProfile: async (
-    inputProfile: Prisma.profilesCreateInput,
-    inputUser: Prisma.usersCreateInput,
-  ): Promise<{ user: users; profile: profiles }> => {
-    const result = await prisma.$transaction(async (tx) => {
+createProfile: async (
+  inputProfile: Prisma.profilesCreateInput,
+  inputUser: Prisma.usersCreateInput,
+): Promise<{ user: users; profile: profiles }> => {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      console.log("[createProfile] Bắt đầu tạo user");
+
       const user = await tx.users.create({
         data: inputUser,
       });
+
+      console.log("[createProfile] Tạo user thành công:", user.id.toString());
 
       const profile = await tx.profiles.create({
         data: {
@@ -151,11 +156,25 @@ export const profileRepository = {
         },
       });
 
+      console.log(
+        "[createProfile] Tạo profile thành công:",
+        profile.id.toString(),
+      );
+
       return { user, profile };
     });
+  } catch (error) {
+    console.error("[profileRepository.createProfile] Lỗi gốc:", error);
 
-    return result;
-  },
+    if (error instanceof Error) {
+      console.error("Tên lỗi:", error.name);
+      console.error("Thông báo:", error.message);
+      console.error("Stack:", error.stack);
+    }
+
+    throw error;
+  }
+},
 
   // cập nhật thông tin người thuê
   updateProfile: async (
