@@ -30,9 +30,10 @@ export const contractPriceAdjustmentsRepository = {
         where: { contract_id: contract_id },
         skip,
         take: limit,
-        orderBy: {
-          effective_date: "desc",
-        },
+        orderBy: [
+          { effective_date: "desc" },
+          { created_at: "desc" },
+        ],
       }),
       prisma.contract_price_adjustments.count({
         where: { contract_id: contract_id },
@@ -57,9 +58,10 @@ export const contractPriceAdjustmentsRepository = {
       select: {
         new_rent_price: true,
       },
-      orderBy: {
-        effective_date: "desc",
-      },
+      orderBy: [
+        { effective_date: "desc" },
+        { created_at: "desc" },
+      ],
     });
     return rent_price?.new_rent_price ?? null;
   },

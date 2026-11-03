@@ -1,5 +1,4 @@
-// Tạo thay đổi giá thuê phòng
-// lấy lịch sử tăng/ giảm giá phòng
+
 
 import { contract_price_adjustments, Prisma } from "@/generated/prisma/client";
 import { priceAjustmentService } from "@/lib/api/services/contract_price_adjustments/contract_price_adjustment.service";

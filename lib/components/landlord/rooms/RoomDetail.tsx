@@ -15,27 +15,29 @@ import {
   Wrench,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ElementType } from "react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { room_services } from "@/generated/prisma/client";
 import {
-  CurrentContract,
-  RoomWithCurrentContract,
-} from "@/lib/api/repositories/rooms/rooms.repository";
-import { Decimal } from "@prisma/client/runtime/client";
-import Link from "next/link";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+import type { RoomWithCurrentContract } from "@/lib/api/repositories/rooms/rooms.repository";
+
 import { FormUpdateRoom } from "./FormUpdateRoom";
 import { FormUpdateStatusRoom } from "./FormUpdateStatusRoom";
+import { ContractRentManager } from "./ContractRentManager";
 
 type RoomDetailProps = {
   room: RoomWithCurrentContract;
 };
 
 const format = {
-  // Format trạng thái phòng
   roomStatus: (status: string) => {
     const statuses: Record<string, string> = {
       AVAILABLE: "Phòng trống",
@@ -47,16 +49,20 @@ const format = {
     return statuses[status] ?? status;
   },
 
-  // Format giá tiền
-  currency: (price: Decimal | number | string) => {
+  currency: (price: unknown) => {
+    const amount = Number(price);
+
+    if (!Number.isFinite(amount)) {
+      return "Chưa xác định";
+    }
+
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
       maximumFractionDigits: 0,
-    }).format(Number(price));
+    }).format(amount);
   },
 
-  // Format thời gian
   date: (date: Date | string) => {
     return new Intl.DateTimeFormat("vi-VN", {
       timeZone: "Asia/Ho_Chi_Minh",
@@ -69,7 +75,10 @@ const format = {
   },
 };
 
-const roomStatusConfig: Record<string, { label: string; className: string }> = {
+const roomStatusConfig: Record<
+  string,
+  { label: string; className: string }
+> = {
   AVAILABLE: {
     label: "Phòng trống",
     className: "border-green-200 bg-green-50 text-green-700",
@@ -89,20 +98,24 @@ const roomStatusConfig: Record<string, { label: string; className: string }> = {
 };
 
 export default function RoomDetail({ room }: RoomDetailProps) {
-  // Chia nhỏ kết quả để quản lý
-  const [roomServices, setRoomServices] = useState<room_services[]>(
-    room.room_services,
+  // Chỉ quản lý giá thuê dưới dạng number ở phía client.
+  // Không sử dụng Prisma.Decimal trong Client Component.
+  const [listedRent, setListedRent] = useState<number>(
+    Number(room.listed_rent),
   );
-  const [currentContract, setCurrentContract] =
-    useState<CurrentContract | null>(room.current_contract);
+
+  const currentContract = room.current_contract;
+
   const status = roomStatusConfig[room.status] ?? {
-    label: room.status,
+    label: format.roomStatus(room.status),
     className: "border-gray-200 bg-gray-50 text-gray-600",
   };
 
+  const isOccupied = room.status === "OCCUPIED";
+
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-full space-y-6 ">
+      <div className="mx-auto max-w-full space-y-6">
         {/* HEADER */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -114,8 +127,8 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                 aria-label="Quay lại"
               >
                 <ArrowLeft className="h-4 w-4" />
-                </Button>
-              </Link>
+              </Button>
+            </Link>
 
             <div>
               <div className="flex flex-wrap items-center gap-3">
@@ -169,7 +182,7 @@ export default function RoomDetail({ room }: RoomDetailProps) {
           <SummaryCard
             icon={Banknote}
             label="Giá thuê niêm yết"
-            value={format.currency(room.listed_rent)}
+            value={format.currency(listedRent)}
             description="Giá thuê cơ bản mỗi tháng"
             iconClass="bg-emerald-50 text-emerald-600"
           />
@@ -178,7 +191,7 @@ export default function RoomDetail({ room }: RoomDetailProps) {
             icon={Users}
             label="Số người tối đa"
             value={`${room.max_occupants} người`}
-            description={`${currentContract?.contract_tenants.length} người trong hợp đồng hiện tại`}
+            description={`${currentContract?.contract_tenants.length ?? 0} người trong hợp đồng hiện tại`}
             iconClass="bg-orange-50 text-orange-600"
           />
         </div>
@@ -191,7 +204,9 @@ export default function RoomDetail({ room }: RoomDetailProps) {
             <Card className="border-slate-200 shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <div>
-                  <CardTitle className="text-lg">Thông tin cơ bản</CardTitle>
+                  <CardTitle className="text-lg">
+                    Thông tin cơ bản
+                  </CardTitle>
                   <p className="mt-1 text-sm text-slate-500">
                     Thông tin chung của phòng trọ
                   </p>
@@ -214,13 +229,19 @@ export default function RoomDetail({ room }: RoomDetailProps) {
 
               <CardContent>
                 <div className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
-                  <InfoItem label="Mã phòng" value={room.room_number} />
+                  <InfoItem
+                    label="Mã phòng"
+                    value={room.room_number}
+                  />
 
-                  <InfoItem label="Diện tích" value={`${room.area} m²`} />
+                  <InfoItem
+                    label="Diện tích"
+                    value={`${room.area} m²`}
+                  />
 
                   <InfoItem
                     label="Giá thuê niêm yết"
-                    value={format.currency(room.listed_rent)}
+                    value={format.currency(listedRent)}
                   />
 
                   <InfoItem
@@ -229,7 +250,9 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                   />
 
                   <div className="sm:col-span-2">
-                    <p className="mb-1.5 text-sm text-slate-500">Mô tả</p>
+                    <p className="mb-1.5 text-sm text-slate-500">
+                      Mô tả
+                    </p>
                     <p className="text-sm leading-6 text-slate-800">
                       {room.description || "Chưa có mô tả cho phòng này."}
                     </p>
@@ -252,28 +275,31 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                     </p>
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex items-center gap-3">
                     {currentContract && (
                       <Badge
                         variant="outline"
                         className={
-                          currentContract.status
+                          currentContract.status === "ACTIVE"
                             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                             : "border-slate-200 bg-slate-100 text-slate-600"
                         }
                       >
-                        {currentContract.status
+                        {currentContract.status === "ACTIVE"
                           ? "Đang hiệu lực"
-                          : currentContract.status}
+                          : format.roomStatus(String(currentContract.status))}
                       </Badge>
                     )}
-                    <Link href={`/landlord/rental_contracts/${currentContract?.id}`}>
-                      
-                        <p className="text-blue-600">Chi tiết</p>
-                     
-                    </Link>
+
+                    {currentContract && (
+                      <Link
+                        href={`/landlord/rental_contracts/${currentContract.id}`}
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        Chi tiết
+                      </Link>
+                    )}
                   </div>
-                  
                 </div>
               </CardHeader>
 
@@ -291,8 +317,9 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                 ) : (
                   <div className="space-y-5">
                     <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
-                      <p className="text-sm text-slate-500">Số hợp đồng</p>
-
+                      <p className="text-sm text-slate-500">
+                        Số hợp đồng
+                      </p>
                       <p className="mt-1 text-lg font-semibold text-blue-700">
                         {currentContract.contract_number}
                       </p>
@@ -392,8 +419,11 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                     </p>
                   </div>
 
-                  <Link href={`/landlord/rooms/${room.id}/services`}>
-                    <p className="text-blue-600 text-sm">Chi tiết</p>
+                  <Link
+                    href={`/landlord/rooms/${room.id}/services`}
+                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    Chi tiết
                   </Link>
                 </div>
               </CardHeader>
@@ -407,36 +437,34 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100">
-                    {room.room_services.map((service) => {
-                      return (
-                        <div
-                          key={service.id}
-                          className="flex items-center gap-3 py-4 first:pt-0 last:pb-0"
-                        >
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                            <Zap className="h-5 w-5" />
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium text-slate-800">
-                              {service.services.name}
-                            </p>
-
-                            <p className="mt-1 text-sm text-slate-500"></p>
-                          </div>
-
-                          <div className="text-right">
-                            <p className="font-semibold text-slate-800">
-                              {format.currency(service.services.default_unit_price)}
-                            </p>
-
-                            <p className="mt-1 text-xs text-slate-500">
-                              / {service.services.unit}
-                            </p>
-                          </div>
+                    {room.room_services.map((service) => (
+                      <div
+                        key={service.id}
+                        className="flex items-center gap-3 py-4 first:pt-0 last:pb-0"
+                      >
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                          <Zap className="h-5 w-5" />
                         </div>
-                      );
-                    })}
+
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-slate-800">
+                            {service.services.name}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="font-semibold text-slate-800">
+                            {format.currency(
+                              service.services.default_unit_price,
+                            )}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            / {service.services.unit}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -448,7 +476,9 @@ export default function RoomDetail({ room }: RoomDetailProps) {
             {/* STATUS CARD */}
             <Card className="border-slate-200 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Trạng thái phòng</CardTitle>
+                <CardTitle className="text-lg">
+                  Trạng thái & điều chỉnh giá phòng
+                </CardTitle>
               </CardHeader>
 
               <CardContent className="space-y-4">
@@ -484,7 +514,7 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                   </div>
                 </div>
 
-                {status.label === "OCCUPIED" && (
+                {isOccupied && (
                   <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-5 text-amber-800">
                     <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                     <p>
@@ -505,40 +535,24 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                 />
               </CardContent>
             </Card>
-            {/* QUICK INFO */}
-            <Card className="border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg">Tóm tắt phòng</CardTitle>
-              </CardHeader>
 
-              <CardContent className="space-y-4">
-                <QuickInfo
-                  label="Người đang ở"
-                  value={`${currentContract?.contract_tenants.length} người`}
-                />
+     
+            {/* CONTRACT RENT MANAGER */}
+            {currentContract && (
+              <ContractRentManager
+                contractId={String(currentContract.id)}
+                roomId={String(room.id)}
+                baseRentPrice={Number(currentContract.rent_price)}
+                onRoomUpdated={(newListedRent) => {
+                  const parsedRent = Number(newListedRent);
 
-                <QuickInfo
-                  label="Dịch vụ đang áp dụng"
-                  value={`${room.room_services.length} dịch vụ`}
-                />
-
-                <QuickInfo
-                  label="Hợp đồng hiện tại"
-                  value={
-                    currentContract
-                      ? currentContract.contract_number
-                      : "Chưa có"
+                  if (Number.isFinite(parsedRent)) {
+                    setListedRent(parsedRent);
                   }
-                />
+                }}
+              />
+            )}
 
-                <div className="border-t border-slate-100 pt-4">
-                  <p className="text-xs leading-5 text-slate-500">
-                    Giá thuê niêm yết có thể khác giá thuê thực tế được ghi
-                    trong hợp đồng.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
@@ -553,7 +567,7 @@ function SummaryCard({
   description,
   iconClass,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   label: string;
   value: string;
   description: string;
@@ -587,7 +601,7 @@ function InfoItem({
 }: {
   label: string;
   value: string;
-  icon?: React.ElementType;
+  icon?: ElementType;
 }) {
   return (
     <div className="min-w-0">
@@ -597,18 +611,6 @@ function InfoItem({
       </p>
 
       <p className="break-words font-medium text-slate-800">{value}</p>
-    </div>
-  );
-}
-
-function QuickInfo({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <p className="text-sm text-slate-500">{label}</p>
-
-      <p className="break-all text-right text-sm font-medium text-slate-800">
-        {value}
-      </p>
     </div>
   );
 }
