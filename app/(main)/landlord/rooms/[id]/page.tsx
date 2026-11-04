@@ -1,4 +1,4 @@
-import { RoomWithCurrentContract } from "@/lib/api/repositories/rooms/rooms.repository";
+import { RoomWithCurrentContract, RoomWithCurrentContractV2 } from "@/lib/api/repositories/rooms/rooms.repository";
 import RoomDetail from "@/lib/components/landlord/rooms/RoomDetail";
 import { ApiResponse } from "@/lib/types/api.type";
 interface PageProps {
@@ -17,7 +17,7 @@ export default async function roomDetail({ params }: PageProps) {
     return <div>Không thể lấy thông tin phòng.</div>;
   }
 
-  const result: ApiResponse<RoomWithCurrentContract> = await res.json();
+  const result: ApiResponse<RoomWithCurrentContractV2> = await res.json();
   if (!result.data) {
     return <div>Không thể lấy thông tin phòng.</div>;
   }
