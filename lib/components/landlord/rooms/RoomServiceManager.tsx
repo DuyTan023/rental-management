@@ -34,6 +34,7 @@ import FormAddRoomService from "./FormAddRoomService";
 
 type RoomServiceProps = {
   room_services: RoomServiceWithService[];
+  room_number: string;
 };
 
 const format = {
@@ -67,6 +68,7 @@ const format = {
 
 export default function RoomServiceManager({
   room_services,
+  room_number,
 }: RoomServiceProps) {
   const params = useParams<{ id: string }>();
   const roomId = params.id;
@@ -214,7 +216,7 @@ export default function RoomServiceManager({
         <CardHeader className="space-y-4">
           <div>
             <CardTitle className="text-lg">
-              Dịch vụ phòng
+              Dịch vụ phòng <span className="text-xl text-green-600 font-bold">{room_number}</span> 
             </CardTitle>
 
             <CardDescription className="mt-1">

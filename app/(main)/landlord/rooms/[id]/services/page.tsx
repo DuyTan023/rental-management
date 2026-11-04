@@ -1,4 +1,5 @@
 
+import { RoomWithCurrentContractV2 } from "@/lib/api/repositories/rooms/rooms.repository";
 import { RoomServiceWithService } from "@/lib/api/repositories/services/room_service.repository";
 import RoomServiceManager from "@/lib/components/landlord/rooms/RoomServiceManager";
 import { ApiResponse } from "@/lib/types/api.type";
@@ -12,6 +13,12 @@ export default async function RoomServicesPage({ params }: PageProps) {
 
   const res = await fetch(
     `${process.env.APP_URL}/api/landlord/rooms/${id}/services/history`,
+    {
+      cache: "no-store",
+    },
+  );
+    const res2 = await fetch(
+    `${process.env.APP_URL}/api/landlord/rooms/${id}`,
     {
       cache: "no-store",
     },
@@ -32,6 +39,8 @@ export default async function RoomServicesPage({ params }: PageProps) {
   }
 
   const result: ApiResponse<RoomServiceWithService[]> = await res.json();
+  const result2 = await res2.json();
+  const room_number = result2.data.room_number;
 
   // Nếu API trả về danh sách rỗng, vẫn render giao diện quản lý.
   const roomServices = Array.isArray(result.data) ? result.data : null;
@@ -48,7 +57,7 @@ export default async function RoomServicesPage({ params }: PageProps) {
 
   return (
     <div className="p-3 sm:p-4 md:p-5">
-      <RoomServiceManager room_services={roomServices} />
+      <RoomServiceManager room_services={roomServices} room_number={room_number}/>
     </div>
   );
 }
