@@ -25,9 +25,25 @@ type RoomServiceDetails = Prisma.room_servicesGetPayload<{
   };
 }>; // Dịch vụ phòng đang sử dụng
 
+export type CurrentMeterReading = {
+  new_value: Prisma.Decimal;
+  reading_date: Date;
+};
+
+export type CurrentMeterReadings = {
+  electricity: CurrentMeterReading | null;
+  water: CurrentMeterReading | null;
+};
+
 export type RoomWithCurrentContract = rooms & {
   current_contract: CurrentContract | null;
   room_services: RoomServiceDetails[];
+}; // Phòng gồm thông tin chi tiết phòng, hợp đồng hiện tại, số ng thuê hiện tại theo hợp đồng, dịch vụ đang được sử dụng
+
+export type RoomWithCurrentContractV2 = rooms & {
+  current_contract: CurrentContract | null;
+  room_services: RoomServiceDetails[];
+  current_meter_readings: CurrentMeterReadings;
 }; // Phòng gồm thông tin chi tiết phòng, hợp đồng hiện tại, số ng thuê hiện tại theo hợp đồng, dịch vụ đang được sử dụng
 
 export const roomRepository = {
@@ -100,7 +116,7 @@ export const roomRepository = {
   },
 
   // Lấy phòng theo ID
-  findById: async (id: bigint): Promise<RoomWithCurrentContract | null> => {
+  findById: async (id: bigint): Promise<RoomWithCurrentContractV2 | null> => {
     const room = await prisma.rooms.findUnique({
       where: { id },
       include: {
@@ -130,10 +146,40 @@ export const roomRepository = {
 
     const { rental_contracts, ...roomData } = room;
 
+    const [electricityReading, waterReading] = await Promise.all([
+      prisma.meter_readings.findFirst({
+        where: {
+          room_id: id,
+          meter_type: "ELECTRICITY",
+        },
+        orderBy: [{ reading_date: "desc" }, { id: "desc" }],
+        select: {
+          new_value: true,
+          reading_date: true,
+        },
+      }),
+
+      prisma.meter_readings.findFirst({
+        where: {
+          room_id: id,
+          meter_type: "WATER",
+        },
+        orderBy: [{ reading_date: "desc" }, { id: "desc" }],
+        select: {
+          new_value: true,
+          reading_date: true,
+        },
+      }),
+    ]);
+
     return {
       ...roomData,
       current_contract: rental_contracts[0] ?? null,
       room_services: room.room_services,
+      current_meter_readings: {
+        electricity: electricityReading,
+        water: waterReading,
+      },
     };
   },
 

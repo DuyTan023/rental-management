@@ -132,7 +132,7 @@ export function ContractTenants({
               </CardDescription>
 
               <Badge variant="secondary" className="mt-2">
-                {tenants.length} người
+                {currentOccupants} người
               </Badge>
             </div>
           </div>
@@ -214,12 +214,14 @@ export function ContractTenants({
                         className={
                           tenant.status === "ACTIVE"
                             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-slate-200 bg-slate-50 text-slate-600"
+                            : "border-red-200 bg-red-50 text-red-600"
                         }
                       >
                         {tenant.status === "ACTIVE"
                           ? "Đang tham gia"
-                          : tenant.status}
+                          : tenant.status === "LEFT"
+                            ? "Đã rời đi"
+                            : tenant.status}
                       </Badge>
                     </TableCell>
 

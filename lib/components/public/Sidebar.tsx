@@ -15,7 +15,7 @@ export default function Sidebar() {
     { name: "Phòng trọ", href: "/landlord/rooms", icon: "🏠" },
     { name: "Dịch vụ", href: "/landlord/services", icon: "⚙️" },
     { name: "Hợp đồng", href: "/landlord/rental_contracts", icon: "📄" },
-    { name: "Hóa đơn", href: "/admin/invoices", icon: "💰" },
+    { name: "Chỉ số điện nước", href: "/landlord/meter_readings", icon: "🚰" },
   ];
 
   const pathname = usePathname();

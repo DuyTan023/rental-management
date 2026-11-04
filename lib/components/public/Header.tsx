@@ -44,7 +44,7 @@ export default function Header() {
     { name: "Phòng trọ", href: "/landlord/rooms" },
     { name: "Dịch vụ", href: "/landlord/services" },
     { name: "Hợp đồng", href: "/landlord/rental_contracts" },
-    { name: "Hóa đơn", href: "/admin/invoices" },
+    { name: "Chỉ số điện nước", href: "/landlord/meter_readings" },
     { name: "Profile", href: "/public/user/profile" },
   ];
 

@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import ContractMeterReadings from "./ContractMeterReadings";
 
 type ContractStatus =
   | "DRAFT"
@@ -391,7 +392,7 @@ export default function ContractInfo({
                 <Clock className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Ngày kết thúc</p>
+                <p className="text-sm text-muted-foreground">Ngày kết thúc dự kiến</p>
                 <p className="mt-1 text-lg font-bold">
                   {formatDate(contract.end_date)}
                 </p>
@@ -406,7 +407,7 @@ export default function ContractInfo({
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Ngày thanh toán
+                  Ngày thanh toán hằng tháng
                 </p>
                 <p className="mt-1 text-lg font-bold">
                   Ngày {contract.billing_day}
@@ -414,7 +415,15 @@ export default function ContractInfo({
               </div>
             </CardContent>
           </Card>
+
+         
         </div>
+         <ContractMeterReadings
+            contractId={String(contract.id)}
+            roomId={String(contract.room_id)}
+            contractStatus={contract.status}
+            contractStartDate={contract.start_date}
+          />
       </section>
     </>
   );

@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   CircleAlert,
   DoorOpen,
+  Droplet,
   FileText,
   Maximize2,
   Pencil,
@@ -27,14 +28,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import type { RoomWithCurrentContract } from "@/lib/api/repositories/rooms/rooms.repository";
+import type { RoomWithCurrentContract, RoomWithCurrentContractV2 } from "@/lib/api/repositories/rooms/rooms.repository";
 
 import { FormUpdateRoom } from "./FormUpdateRoom";
 import { FormUpdateStatusRoom } from "./FormUpdateStatusRoom";
 import { ContractRentManager } from "./ContractRentManager";
 
 type RoomDetailProps = {
-  room: RoomWithCurrentContract;
+  room: RoomWithCurrentContractV2;
 };
 
 const format = {
@@ -112,6 +113,12 @@ export default function RoomDetail({ room }: RoomDetailProps) {
   };
 
   const isOccupied = room.status === "OCCUPIED";
+
+  const electricityReading =
+    room.current_meter_readings?.electricity ?? null;
+
+  const waterReading =
+    room.current_meter_readings?.water ?? null;
 
   return (
     <div className="min-h-screen">
@@ -247,6 +254,26 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                   <InfoItem
                     label="Số người tối đa"
                     value={`${room.max_occupants} người`}
+                  />
+
+                  <InfoItem
+                    label="Chỉ số điện hiện tại"
+                    value={
+                      electricityReading
+                        ? `${Number(electricityReading.new_value).toLocaleString("vi-VN")} kWh`
+                        : "Không có thông tin"
+                    }
+                    icon={Zap}
+                  />
+
+                  <InfoItem
+                    label="Chỉ số nước hiện tại"
+                    value={
+                      waterReading
+                        ? `${Number(waterReading.new_value).toLocaleString("vi-VN")} m³`
+                        : "Không có thông tin"
+                    }
+                    icon={Droplet}
                   />
 
                   <div className="sm:col-span-2">

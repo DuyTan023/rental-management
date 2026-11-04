@@ -3,6 +3,7 @@ import type { PaginationResult } from "@/lib/types/api.type";
 import {
   roomRepository,
   RoomWithCurrentContract,
+  RoomWithCurrentContractV2,
 } from "../../repositories/rooms/rooms.repository";
 
 type GetRoomParams = {
@@ -51,7 +52,7 @@ export const roomService = {
     }
   },
 
-  getRooomById: async (id: bigint): Promise<RoomWithCurrentContract> => {
+  getRooomById: async (id: bigint): Promise<RoomWithCurrentContractV2> => {
     try {
       const room = await roomRepository.findById(id);
 
