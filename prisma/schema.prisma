@@ -209,22 +209,26 @@ model services {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model meter_readings {
-  id               BigInt            @id @default(autoincrement())
+  id               BigInt                @id @default(autoincrement())
   room_id          BigInt
   contract_id      BigInt?
   service_id       BigInt
   meter_type       meter_type
-  reading_date     DateTime          @db.Date
-  old_value        Decimal           @db.Decimal(12, 2)
-  new_value        Decimal           @db.Decimal(12, 2)
-  consumption      Decimal?          @default(dbgenerated("(new_value - old_value)")) @db.Decimal(12, 2)
+  reading_date     DateTime              @db.Date
+  old_value        Decimal               @db.Decimal(12, 2)
+  new_value        Decimal               @db.Decimal(12, 2)
+  consumption      Decimal?              @default(dbgenerated("(new_value - old_value)")) @db.Decimal(12, 2)
   note             String?
   created_by       BigInt?
-  created_at       DateTime          @default(now()) @db.Timestamptz(6)
-  rental_contracts rental_contracts? @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users            users?            @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  rooms            rooms             @relation(fields: [room_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  services         services          @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_at       DateTime              @default(now()) @db.Timestamptz(6)
+  status           meter_reading_status? @default(PENDING)
+  image_url        String?
+  period_year      Int?                  @db.SmallInt
+  period_month     Int?                  @db.SmallInt
+  rental_contracts rental_contracts?     @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users            users?                @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rooms            rooms                 @relation(fields: [room_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  services         services              @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([room_id, service_id, reading_date], map: "uq_meter_reading")
 }
@@ -303,4 +307,10 @@ enum service_type {
   METERED
   FIXED_PER_MONTH
   FIXED_PER_HEAD
+}
+
+enum meter_reading_status {
+  PENDING
+  APPROVED
+  REJECTED
 }
