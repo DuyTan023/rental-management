@@ -28,14 +28,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import type { RoomWithCurrentContract, RoomWithCurrentContractV2 } from "@/lib/api/repositories/rooms/rooms.repository";
+import type {RoomWithCurrentContract,} from "@/lib/api/repositories/rooms/rooms.repository";
 
 import { FormUpdateRoom } from "./FormUpdateRoom";
 import { FormUpdateStatusRoom } from "./FormUpdateStatusRoom";
 import { ContractRentManager } from "./ContractRentManager";
 
 type RoomDetailProps = {
-  room: RoomWithCurrentContractV2;
+  room: RoomWithCurrentContract;
+  currentReadings: CurrentMeterReading[];
+};
+type CurrentMeterReading = {
+  meterType: "ELECTRICITY" | "WATER";
+  currentValue: number;
+  readingDate: string | Date;
+  source: "INITIAL_HANDOVER" | "MONTHLY_REPORT";
 };
 
 const format = {
@@ -98,7 +105,7 @@ const roomStatusConfig: Record<
   },
 };
 
-export default function RoomDetail({ room }: RoomDetailProps) {
+export default function RoomDetail({ room, currentReadings, }: RoomDetailProps) {
   // Chỉ quản lý giá thuê dưới dạng number ở phía client.
   // Không sử dụng Prisma.Decimal trong Client Component.
   const [listedRent, setListedRent] = useState<number>(
@@ -115,10 +122,14 @@ export default function RoomDetail({ room }: RoomDetailProps) {
   const isOccupied = room.status === "OCCUPIED";
 
   const electricityReading =
-    room.current_meter_readings?.electricity ?? null;
+    currentReadings.find(
+      (reading) => reading.meterType === "ELECTRICITY"
+    ) ?? null;
 
   const waterReading =
-    room.current_meter_readings?.water ?? null;
+    currentReadings.find(
+      (reading) => reading.meterType === "WATER"
+    ) ?? null;
 
   return (
     <div className="min-h-screen">
@@ -257,24 +268,24 @@ export default function RoomDetail({ room }: RoomDetailProps) {
                   />
 
                   <InfoItem
-                    label="Chỉ số điện hiện tại"
-                    value={
-                      electricityReading
-                        ? `${Number(electricityReading.new_value).toLocaleString("vi-VN")} kWh`
-                        : "Không có thông tin"
-                    }
-                    icon={Zap}
-                  />
+                      label="Chỉ số điện hiện tại"
+                      value={
+                        electricityReading
+                          ? `${Number(electricityReading.currentValue).toLocaleString("vi-VN")} kWh`
+                          : "Chưa có thông tin"
+                      }
+                      icon={Zap}
+                    />
 
-                  <InfoItem
-                    label="Chỉ số nước hiện tại"
-                    value={
-                      waterReading
-                        ? `${Number(waterReading.new_value).toLocaleString("vi-VN")} m³`
-                        : "Không có thông tin"
-                    }
-                    icon={Droplet}
-                  />
+                    <InfoItem
+                      label="Chỉ số nước hiện tại"
+                      value={
+                        waterReading
+                          ? `${Number(waterReading.currentValue).toLocaleString("vi-VN")} m³`
+                          : "Chưa có thông tin"
+                      }
+                      icon={Droplet}
+                    />
 
                   <div className="sm:col-span-2">
                     <p className="mb-1.5 text-sm text-slate-500">

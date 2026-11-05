@@ -1,54 +1,316 @@
+import { auth } from "@/auth";
+import {
+  CreateMeterReadingInput,
+  meterReadingService,
+} from "@/lib/api/services/meter_readings/meter_reading.services";
+import {
+  apiErrorResponse,
+  apiSuccessResponse,
+} from "@/lib/utils/api-error";
+import { parseId } from "@/lib/utils/function";
 
-// app/api/landlord/meter_readings/route.ts
+type InitialHandoverInput = Extract<
+  CreateMeterReadingInput,
+  { type: "INITIAL_HANDOVER" }
+>;
 
-import { Prisma, meter_readings } from "@/generated/prisma/client";
-import { meterReadingService } from "@/lib/api/services/meter_readings/meter_reading.services";
-
-import { ApiResponse, PaginationResult } from "@/lib/types/api.type";
-import { apiErrorResponse, apiSuccessResponse, serverErrorResponse } from "@/lib/utils/api-error";
-import { serializeBigInt } from "@/lib/utils/serialize";
-import { NextRequest, NextResponse } from "next/server";
-
-// Lấy danh sách chỉ số theo phòng và hợp đồng
-export async function GET(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const searchParams = req.nextUrl.searchParams;
+    const session = await auth();
 
-    const roomId = searchParams.get("room_id");
-    const contractId = searchParams.get("contract_id");
-    const page = Number(searchParams.get("page") ?? 1);
-    const limit = Number(searchParams.get("limit") ?? 10);
-
-    if (!roomId || !contractId) {
-      return apiErrorResponse("Vui lòng cung cấp room_id và contract_id", 400)
+    if (!session?.user?.id) {
+      return apiErrorResponse("Xác thực thất bại!", 401);
     }
 
-    const meterReadings = await meterReadingService.getMeterReading({
-      room_id: BigInt(roomId),
-      contract_id: BigInt(contractId),
-      page,
-      limit,
-    });
+    const userID = parseId(session.user.id);
 
-    return apiSuccessResponse("Lấy danh sách chỉ số thành công!", meterReadings, 200);
+    if (!userID) {
+      return apiErrorResponse("UserId không hợp lệ", 401);
+    }
+
+    const body = await req.json();
+
+    if (
+      body.type !== "INITIAL_HANDOVER" &&
+      body.type !== "MONTHLY_REPORT"
+    ) {
+      return apiErrorResponse("Nghiệp vụ không hợp lệ!", 400);
+    }
+
+    const readingDate = new Date(body.readingDate);
+
+    if (Number.isNaN(readingDate.getTime())) {
+      return apiErrorResponse("Ngày ghi nhận không hợp lệ!", 400);
+    }
+
+    const roomId = parseId(body.roomId);
+
+    if (!roomId) {
+      return apiErrorResponse("RoomId không hợp lệ!", 400);
+    }
+
+    let input: CreateMeterReadingInput;
+
+    if (body.type === "INITIAL_HANDOVER") {
+      if (!Array.isArray(body.readings) || body.readings.length !== 2) {
+        return apiErrorResponse(
+          "Cần cung cấp đủ chỉ số điện và nước bàn giao!",
+          400
+        );
+      }
+
+      const electricity = body.readings.find(
+        (item: any) => item.meterType === "ELECTRICITY"
+      );
+
+      const water = body.readings.find(
+        (item: any) => item.meterType === "WATER"
+      );
+      
+
+      const contractId = parseId(body.contractId);
+      const electricityServiceId = parseId(electricity?.serviceId);
+      const waterServiceId = parseId(water?.serviceId);
+      
+
+      if (
+        !contractId ||
+        !electricity ||
+        !water ||
+        !electricityServiceId ||
+        !waterServiceId
+      ) {
+        return apiErrorResponse(
+          "Thông tin hợp đồng hoặc dịch vụ bàn giao không hợp lệ!",
+          400
+        );
+      }
+
+      const electricityValue = Number(electricity.newValue);
+      const waterValue = Number(water.newValue);
+
+      if (
+        !Number.isFinite(electricityValue) ||
+        !Number.isFinite(waterValue) ||
+        electricityValue < 0 ||
+        waterValue < 0
+      ) {
+        return apiErrorResponse("Chỉ số bàn giao không hợp lệ!", 400);
+      }
+
+      const readings: InitialHandoverInput["readings"] = [
+        {
+          meterType: "ELECTRICITY",
+          serviceId: electricityServiceId,
+          newValue: electricityValue,
+        },
+        {
+          meterType: "WATER",
+          serviceId: waterServiceId,
+          newValue: waterValue,
+        },
+      ];
+
+      input = {
+        type: "INITIAL_HANDOVER",
+        roomId,
+        contractId,
+        readingDate,
+        readings,
+        note:
+          typeof body.note === "string"
+            ? body.note.trim() || null
+            : null,
+            };
+    } else {
+      const serviceId = parseId(body.serviceId);
+      const newValue = Number(body.newValue);
+
+      if (!serviceId) {
+        return apiErrorResponse("ServiceId không hợp lệ!", 400);
+      }
+
+      if (
+        body.meterType !== "ELECTRICITY" &&
+        body.meterType !== "WATER"
+      ) {
+        return apiErrorResponse("Loại đồng hồ không hợp lệ!", 400);
+      }
+
+      if (!Number.isFinite(newValue) || newValue < 0) {
+        return apiErrorResponse("Chỉ số mới không hợp lệ!", 400);
+      }
+
+      if (
+        typeof body.imageUrl !== "string" ||
+        !body.imageUrl.trim()
+      ) {
+        return apiErrorResponse("Ảnh chỉ số là bắt buộc!", 400);
+      }
+
+      input = {
+        type: "MONTHLY_REPORT",
+        roomId,
+        serviceId,
+        meterType: body.meterType,
+        readingDate,
+        newValue,
+        imageUrl: body.imageUrl,
+      };
+    }
+
+    const result = await meterReadingService.create(userID, input);
+
+    return apiSuccessResponse(
+      "Tạo báo cáo chỉ số thành công",
+      result,
+      201
+    );
   } catch (error) {
-    if (error instanceof Error && error.message === "INVALID_PAGINATION") {
-      return apiErrorResponse("Thông tin phân trang không hợp lệ", 400)
+    console.error("POST /api/meter-readings:", error);
+
+    if (error instanceof Error) {
+      const errorMap: Record<string, { message: string; status: number }> = {
+        USER_NOT_FOUND: {
+          message: "Không tìm thấy tài khoản",
+          status: 404,
+        },
+        USER_INACTIVE: {
+          message: "Tài khoản hiện không hoạt động",
+          status: 403,
+        },
+        FORBIDDEN: {
+          message: "Bạn không có quyền thực hiện",
+          status: 403,
+        },
+        ROOM_NOT_FOUND: {
+          message: "Không tìm thấy phòng",
+          status: 404,
+        },
+        ACTIVE_CONTRACT_NOT_FOUND: {
+          message: "Phòng không có hợp đồng đang hoạt động",
+          status: 404,
+        },
+        PROFILE_NOT_FOUND: {
+          message: "Không tìm thấy hồ sơ người thuê",
+          status: 404,
+        },
+        NOT_CONTRACT_TENANT: {
+          message: "Bạn không thuộc hợp đồng thuê phòng này",
+          status: 403,
+        },
+        SUBMISSION_PERIOD_CLOSED: {
+          message: "Đã hết thời gian gửi báo cáo",
+          status: 400,
+        },
+        READING_ALREADY_SUBMITTED: {
+          message: "Đã có báo cáo cho loại chỉ số này trong kỳ",
+          status: 409,
+        },
+        INITIAL_READING_NOT_FOUND: {
+          message: "Chưa có chỉ số bàn giao hoặc chỉ số gốc hợp lệ",
+          status: 409,
+        },
+        INVALID_READING_VALUE: {
+          message: "Chỉ số mới không được nhỏ hơn chỉ số cũ",
+          status: 400,
+        },
+        INVALID_INITIAL_READINGS: {
+          message: "Cần có đủ chỉ số điện và nước bàn giao",
+          status: 400,
+        },
+        INVALID_METER_TYPE: {
+          message: "Loại đồng hồ không hợp lệ",
+          status: 400,
+        },
+      };
+
+      const mappedError = errorMap[error.message];
+
+      if (mappedError) {
+        return apiErrorResponse(
+          mappedError.message,
+          mappedError.status
+        );
+      }
     }
 
-    return serverErrorResponse();
+    return apiErrorResponse("Đã xảy ra lỗi hệ thống", 500);
   }
 }
 
-// Tạo mới một bản ghi chỉ số
-export async function POST(req: NextRequest) {
+// Lấy danh sách phòng có hợp đồng ACTIVE và báo cáo chỉ số theo kỳ
+export async function GET(req: Request) {
   try {
-    const body: Prisma.meter_readingsCreateInput = await req.json();
+    // 1. Xác thực
+    // const session = await auth();
 
-    const meterReading = await meterReadingService.createMeterReading(body);
+    // if (!session?.user?.id) {
+    //   return apiErrorResponse("Xác thực thất bại!", 401);
+    // }
 
-    return apiSuccessResponse("Thêm mới chỉ số thành công!", meterReading, 201)
+    // // 2. Kiểm tra quyền chủ trọ
+    // if (session.user.role !== "LANDLORD") {
+    //   return apiErrorResponse(
+    //     "Bạn không có quyền xem danh sách báo cáo!",
+    //     403
+    //   );
+    // }
+
+    // 3. Lấy tháng và năm từ query
+    const { searchParams } = new URL(req.url);
+
+    const monthParam = searchParams.get("month");
+    const yearParam = searchParams.get("year");
+
+    if (!monthParam || !yearParam) {
+      return apiErrorResponse(
+        "Vui lòng cung cấp tháng và năm báo cáo!",
+        400
+      );
+    }
+
+    const month = Number(monthParam);
+    const year = Number(yearParam);
+
+    if (
+      !Number.isInteger(month) ||
+      month < 1 ||
+      month > 12 ||
+      !Number.isInteger(year) ||
+      year < 2000
+    ) {
+      return apiErrorResponse(
+        "Tháng hoặc năm báo cáo không hợp lệ!",
+        400
+      );
+    }
+
+    // 4. Gọi Service
+    const result = await meterReadingService.getReadingsByPeriod(
+      month,
+      year
+    );
+
+    // 5. Trả kết quả
+    return apiSuccessResponse(
+      "Lấy danh sách báo cáo chỉ số thành công",
+      result,
+      200
+    );
   } catch (error) {
-    return serverErrorResponse();
+    console.error("GET /api/meter-readings:", error);
+
+    if (
+      error instanceof Error &&
+      error.message === "INVALID_PERIOD"
+    ) {
+      return apiErrorResponse(
+        "Tháng hoặc năm báo cáo không hợp lệ!",
+        400
+      );
+    }
+
+    return apiErrorResponse("Đã xảy ra lỗi hệ thống", 500);
   }
 }

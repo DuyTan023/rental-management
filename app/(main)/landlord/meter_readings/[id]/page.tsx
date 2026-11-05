@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -6,136 +7,41 @@ import {
   CheckCircle2,
   Droplets,
   Image as ImageIcon,
+  Loader2,
   XCircle,
   Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type ReadingStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 type Reading = {
-  type: "ELECTRICITY" | "WATER";
+  id: string;
+  meterType: "ELECTRICITY" | "WATER";
   oldValue: number;
   newValue: number;
+  consumption: number;
+  readingDate: string;
   status: ReadingStatus;
-  submittedAt: string;
-  note: string;
-  imageUrl?: string;
+  imageUrl: string | null;
+  note: string | null;
 };
 
-const mockRoomDetails: Record<
-  string,
-  { roomNumber: string; tenant: string; readings: Reading[] }
-> = {
-  "1": {
-    roomNumber: "P101",
-    tenant: "Nguyễn Văn An",
-    readings: [
-      {
-        type: "ELECTRICITY",
-        oldValue: 1200,
-        newValue: 1250,
-        status: "PENDING",
-        submittedAt: "03/04/2026 09:15",
-        note: "Chỉ số điện tháng này.",
-      },
-      {
-        type: "WATER",
-        oldValue: 300,
-        newValue: 320,
-        status: "PENDING",
-        submittedAt: "03/04/2026 09:16",
-        note: "Chỉ số nước tháng này.",
-      },
-    ],
-  },
-  "2": {
-    roomNumber: "P102",
-    tenant: "Trần Thị Bình",
-    readings: [
-      {
-        type: "ELECTRICITY",
-        oldValue: 940,
-        newValue: 980,
-        status: "APPROVED",
-        submittedAt: "02/04/2026 10:00",
-        note: "Đã kiểm tra.",
-      },
-      {
-        type: "WATER",
-        oldValue: 200,
-        newValue: 215,
-        status: "PENDING",
-        submittedAt: "03/04/2026 08:30",
-        note: "",
-      },
-    ],
-  },
-  "3": {
-    roomNumber: "P103",
-    tenant: "Lê Văn Cường",
-    readings: [
-      {
-        type: "ELECTRICITY",
-        oldValue: 1500,
-        newValue: 1560,
-        status: "PENDING",
-        submittedAt: "03/04/2026 11:00",
-        note: "",
-      },
-    ],
-  },
-  "4": {
-    roomNumber: "P104",
-    tenant: "Phạm Thị Dung",
-    readings: [],
-  },
-  "5": {
-    roomNumber: "P105",
-    tenant: "Hoàng Văn Minh",
-    readings: [
-      {
-        type: "ELECTRICITY",
-        oldValue: 850,
-        newValue: 870,
-        status: "REJECTED",
-        submittedAt: "03/04/2026 14:00",
-        note: "Ảnh chưa rõ số trên đồng hồ.",
-      },
-      {
-        type: "WATER",
-        oldValue: 180,
-        newValue: 190,
-        status: "APPROVED",
-        submittedAt: "03/04/2026 14:05",
-        note: "",
-      },
-    ],
-  },
-  "6": {
-    roomNumber: "P106",
-    tenant: "Đỗ Thị Hoa",
-    readings: [
-      {
-        type: "ELECTRICITY",
-        oldValue: 1050,
-        newValue: 1100,
-        status: "APPROVED",
-        submittedAt: "02/04/2026 09:00",
-        note: "",
-      },
-      {
-        type: "WATER",
-        oldValue: 240,
-        newValue: 260,
-        status: "APPROVED",
-        submittedAt: "02/04/2026 09:05",
-        note: "",
-      },
-    ],
-  },
+type RoomDetail = {
+  roomId: string;
+  roomNumber: string;
+  contractId: string;
+  tenants: {
+    profileId: string;
+    fullName: string;
+  }[];
+  status: "COMPLETED" | "PARTIAL" | "MISSING";
+  readings: {
+    electricity: Reading | null;
+    water: Reading | null;
+  };
 };
 
 function statusLabel(status: ReadingStatus) {
@@ -150,67 +56,171 @@ function statusClass(status: ReadingStatus) {
   return "bg-amber-100 text-amber-700";
 }
 
+function formatDate(value: string) {
+  return new Date(value).toLocaleString("vi-VN");
+}
+
 export default function MeterReadingDetailPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
 
   const roomId = params.id;
-  const month = searchParams.get("month") ?? "4";
-  const year = searchParams.get("year") ?? "2026";
+  const month = searchParams.get("month") ?? String(new Date().getMonth() + 1);
+  const year = searchParams.get("year") ?? String(new Date().getFullYear());
 
-  const room = mockRoomDetails[roomId];
+  const [room, setRoom] = useState<RoomDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [readings, setReadings] = useState<Reading[]>(room?.readings ?? []);
-  const [rejectingIndex, setRejectingIndex] = useState<number | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
-  function approveReading(index: number) {
-    setReadings((current) =>
-      current.map((reading, i) =>
-        i === index ? { ...reading, status: "APPROVED" } : reading,
-      ),
-    );
-    setMessage("Đã chấp nhận báo cáo (dữ liệu minh họa).");
-  }
+  const fetchRoomDetail = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-  function rejectReading(index: number) {
+      const response = await fetch(
+        `/api/landlord/meter_readings?month=${month}&year=${year}`,
+        { cache: "no-store" }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Không thể tải báo cáo chỉ số");
+      }
+
+      const data = result.data?.data ?? result.data;
+
+      const foundRoom = (data.items ?? []).find(
+        (item: RoomDetail) => String(item.roomId) === String(roomId)
+      );
+
+      if (!foundRoom) {
+        setRoom(null);
+        return;
+      }
+
+      setRoom(foundRoom);
+    } catch (error) {
+      console.error("Fetch meter reading detail:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi tải dữ liệu"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [roomId, month, year]);
+
+  useEffect(() => {
+    fetchRoomDetail();
+  }, [fetchRoomDetail]);
+
+  const updateStatus = async (
+    reading: Reading,
+    status: "APPROVED" | "REJECTED",
+    note?: string
+  ) => {
+    try {
+      setProcessingId(reading.id);
+      setMessage("");
+
+      const response = await fetch(
+        `/api/landlord/meter_readings/${reading.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status,
+            ...(status === "REJECTED" ? { note } : {}),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Không thể cập nhật trạng thái");
+      }
+
+      setMessage(
+        status === "APPROVED"
+          ? "Đã chấp nhận báo cáo thành công."
+          : "Đã từ chối báo cáo thành công."
+      );
+
+      setRejectingId(null);
+      setRejectionReason("");
+
+      await fetchRoomDetail();
+    } catch (error) {
+      console.error("Update meter reading status:", error);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi cập nhật trạng thái"
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = (reading: Reading) => {
     if (!rejectionReason.trim()) {
       setMessage("Vui lòng nhập lý do từ chối.");
       return;
     }
 
-    setReadings((current) =>
-      current.map((reading, i) =>
-        i === index
-          ? {
-              ...reading,
-              status: "REJECTED",
-              note: rejectionReason.trim(),
-            }
-          : reading,
-      ),
-    );
+    updateStatus(reading, "REJECTED", rejectionReason.trim());
+  };
 
-    setRejectingIndex(null);
-    setRejectionReason("");
-    setMessage("Đã từ chối báo cáo (dữ liệu minh họa).");
+  if (loading) {
+    return (
+      <div className="flex min-h-64 items-center justify-center gap-2">
+        <Loader2 className="size-5 animate-spin" />
+        <span>Đang tải chi tiết báo cáo...</span>
+      </div>
+    );
   }
 
-  if (!room) {
+  if (error || !room) {
     return (
       <div className="space-y-4 p-6">
-        <p className="font-semibold">Không tìm thấy phòng.</p>
+        <p className="font-semibold">
+          {error || "Không tìm thấy dữ liệu phòng trong kỳ này."}
+        </p>
+
         <Link
-          href="/landlord/meter_readings"
+          href={`/landlord/meter_readings?month=${month}&year=${year}`}
           className="inline-flex items-center gap-2 text-sm text-blue-600"
         >
           <ArrowLeft className="size-4" />
           Quay lại danh sách
         </Link>
+
+        {error && (
+          <button
+            onClick={fetchRoomDetail}
+            className="ml-3 text-sm font-medium underline"
+          >
+            Thử lại
+          </button>
+        )}
       </div>
     );
   }
+
+  const readings = [
+    room.readings.electricity,
+    room.readings.water,
+  ].filter((reading): reading is Reading => reading !== null);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
@@ -226,11 +236,15 @@ export default function MeterReadingDetailPage() {
         <p className="text-sm text-muted-foreground">
           Kỳ {month.padStart(2, "0")}/{year}
         </p>
+
         <h1 className="mt-1 text-2xl font-bold">
           Chi tiết chỉ số phòng {room.roomNumber}
         </h1>
+
         <p className="mt-1 text-sm text-muted-foreground">
-          Người thuê: {room.tenant}
+          Người thuê:{" "}
+          {room.tenants.map((tenant) => tenant.fullName).join(", ") ||
+            "Chưa có thông tin"}
         </p>
       </div>
 
@@ -250,15 +264,16 @@ export default function MeterReadingDetailPage() {
         </div>
       ) : (
         <div className="space-y-5">
-          {readings.map((reading, index) => {
-            const isElectricity = reading.type === "ELECTRICITY";
+          {readings.map((reading) => {
+            const isElectricity = reading.meterType === "ELECTRICITY";
             const Icon = isElectricity ? Zap : Droplets;
             const unit = isElectricity ? "kWh" : "m³";
-            const consumption = reading.newValue - reading.oldValue;
+            const isProcessing = processingId === reading.id;
+            const isRejecting = rejectingId === reading.id;
 
             return (
               <section
-                key={reading.type}
+                key={reading.id}
                 className="overflow-hidden rounded-xl border bg-white"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
@@ -270,50 +285,55 @@ export default function MeterReadingDetailPage() {
                         }`}
                       />
                     </div>
+
                     <div>
                       <h2 className="font-semibold">
                         Chỉ số {isElectricity ? "điện" : "nước"}
                       </h2>
+
                       <p className="text-xs text-muted-foreground">
-                        Gửi lúc {reading.submittedAt}
+                        Gửi lúc {formatDate(reading.readingDate)}
                       </p>
                     </div>
                   </div>
 
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${statusClass(reading.status)}`}
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${statusClass(
+                      reading.status
+                    )}`}
                   >
                     {statusLabel(reading.status)}
                   </span>
                 </div>
 
                 <div className="grid gap-5 p-4 md:grid-cols-2">
-                  {/* Ảnh đồng hồ */}
                   <div>
                     <p className="mb-2 text-sm font-medium">
                       Ảnh đồng hồ người thuê gửi
                     </p>
 
                     {reading.imageUrl ? (
-                      <img
-                        src={reading.imageUrl}
-                        alt={`Ảnh đồng hồ ${isElectricity ? "điện" : "nước"}`}
-                        className="max-h-72 w-full rounded-lg border object-contain"
-                      />
+                      <a
+                        href={reading.imageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <img
+                          src={reading.imageUrl}
+                          alt={`Ảnh đồng hồ ${isElectricity ? "điện" : "nước"}`}
+                          className="max-h-72 w-full rounded-lg border object-contain"
+                        />
+                      </a>
                     ) : (
                       <div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 p-6 text-center">
                         <ImageIcon className="size-10 text-muted-foreground" />
                         <p className="mt-3 text-sm font-medium">
-                          Ảnh minh họa chưa được cung cấp
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Khi kết nối API, hiển thị ảnh từ image_url tại đây.
+                          Không có ảnh đồng hồ
                         </p>
                       </div>
                     )}
                   </div>
 
-                  {/* Số liệu */}
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="rounded-lg border p-3">
@@ -342,7 +362,7 @@ export default function MeterReadingDetailPage() {
                         Lượng tiêu thụ trong kỳ
                       </p>
                       <p className="mt-1 text-2xl font-bold text-blue-800">
-                        {consumption.toLocaleString("vi-VN")} {unit}
+                        {reading.consumption.toLocaleString("vi-VN")} {unit}
                       </p>
                       <p className="mt-1 text-xs text-blue-700">
                         {reading.newValue} − {reading.oldValue}
@@ -351,9 +371,7 @@ export default function MeterReadingDetailPage() {
 
                     {reading.note && (
                       <div className="rounded-lg border p-3">
-                        <p className="text-sm font-medium">
-                          Ghi chú / lý do từ chối
-                        </p>
+                        <p className="text-sm font-medium">Ghi chú</p>
                         <p className="mt-1 text-sm text-muted-foreground">
                           {reading.note}
                         </p>
@@ -362,41 +380,46 @@ export default function MeterReadingDetailPage() {
                   </div>
                 </div>
 
-                {/* Duyệt báo cáo */}
                 <div className="border-t bg-muted/20 p-4">
                   {reading.status === "PENDING" ? (
-                    rejectingIndex === index ? (
+                    isRejecting ? (
                       <div className="space-y-3">
                         <label
-                          htmlFor={`reason-${index}`}
+                          htmlFor={`reason-${reading.id}`}
                           className="text-sm font-medium"
                         >
                           Lý do từ chối
                         </label>
+
                         <textarea
-                          id={`reason-${index}`}
+                          id={`reason-${reading.id}`}
                           value={rejectionReason}
                           onChange={(e) => setRejectionReason(e.target.value)}
                           placeholder="Ví dụ: Ảnh mờ, không đọc được chỉ số..."
                           className="min-h-24 w-full rounded-md border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                         />
+
                         <div className="flex flex-wrap justify-end gap-2">
                           <button
                             type="button"
+                            disabled={isProcessing}
                             onClick={() => {
-                              setRejectingIndex(null);
+                              setRejectingId(null);
                               setRejectionReason("");
+                              setMessage("");
                             }}
-                            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+                            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
                           >
                             Hủy
                           </button>
+
                           <button
                             type="button"
-                            onClick={() => rejectReading(index)}
-                            className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                            disabled={isProcessing}
+                            onClick={() => handleReject(reading)}
+                            className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
                           >
-                            Xác nhận từ chối
+                            {isProcessing ? "Đang xử lý..." : "Xác nhận từ chối"}
                           </button>
                         </div>
                       </div>
@@ -404,21 +427,29 @@ export default function MeterReadingDetailPage() {
                       <div className="flex flex-wrap justify-end gap-2">
                         <button
                           type="button"
+                          disabled={isProcessing}
                           onClick={() => {
-                            setRejectingIndex(index);
+                            setRejectingId(reading.id);
+                            setRejectionReason("");
                             setMessage("");
                           }}
-                          className="inline-flex items-center gap-2 rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                          className="inline-flex items-center gap-2 rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                         >
                           <XCircle className="size-4" />
                           Từ chối
                         </button>
+
                         <button
                           type="button"
-                          onClick={() => approveReading(index)}
-                          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                          disabled={isProcessing}
+                          onClick={() => updateStatus(reading, "APPROVED")}
+                          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
                         >
-                          <CheckCircle2 className="size-4" />
+                          {isProcessing ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="size-4" />
+                          )}
                           Chấp nhận
                         </button>
                       </div>
@@ -434,11 +465,6 @@ export default function MeterReadingDetailPage() {
           })}
         </div>
       )}
-
-      <p className="text-xs text-muted-foreground">
-        Đây là giao diện dữ liệu tĩnh. Thao tác duyệt và từ chối chưa lưu vào
-        database; ảnh thật sẽ hiển thị sau khi kết nối API.
-      </p>
     </div>
   );
 }

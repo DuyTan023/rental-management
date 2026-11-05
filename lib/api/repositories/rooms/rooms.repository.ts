@@ -116,7 +116,7 @@ export const roomRepository = {
   },
 
   // Lấy phòng theo ID
-  findById: async (id: bigint): Promise<RoomWithCurrentContractV2 | null> => {
+  findById: async (id: bigint): Promise<RoomWithCurrentContract | null> => {
     const room = await prisma.rooms.findUnique({
       where: { id },
       include: {
@@ -176,10 +176,10 @@ export const roomRepository = {
       ...roomData,
       current_contract: rental_contracts[0] ?? null,
       room_services: room.room_services,
-      current_meter_readings: {
-        electricity: electricityReading,
-        water: waterReading,
-      },
+      // current_meter_readings: {
+      //   electricity: electricityReading,
+      //   water: waterReading,
+      // },
     };
   },
 

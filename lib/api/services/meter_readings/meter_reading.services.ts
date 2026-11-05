@@ -1,64 +1,295 @@
-import { meter_readings, Prisma } from "@/generated/prisma/client";
-import { PaginationResult } from "@/lib/types/api.type";
+
+import { meter_type } from "@/generated/prisma/enums";
+import { prisma } from "@/lib/prisma";
 import { meterReadingRepository } from "../../repositories/meter_readings/meter_reading.repository";
 
-type GetMeterReadingParams = {
-  room_id: bigint;
-  contract_id: bigint;
-  page?: number;
-  limit?: number;
-};
+export type CreateMeterReadingInput =
+  | {
+      type: "INITIAL_HANDOVER";
+      roomId: bigint;
+      contractId: bigint;
+      readingDate: Date;
+      note?: string | null;
+      readings: [
+        {
+          meterType: "ELECTRICITY";
+          serviceId: bigint;
+          newValue: number;
+        },
+        {
+          meterType: "WATER";
+          serviceId: bigint;
+          newValue: number;
+        }
+      ];
+    }
+  | {
+      type: "MONTHLY_REPORT";
+      roomId: bigint;
+      serviceId: bigint;
+      meterType: meter_type;
+      readingDate: Date;
+      newValue: number;
+      imageUrl: string;
+    };
+
+const meterTypes: meter_type[] = ["ELECTRICITY", "WATER"];
 
 export const meterReadingService = {
-  // Lấy danh sách chỉ số theo phòng và hợp đồng
-  getMeterReading: async ({
-    room_id,
-    contract_id,
-    page = 1,
-    limit = 10,
-  }: GetMeterReadingParams): Promise<PaginationResult<meter_readings>> => {
-    try {
-      if (page < 1 || limit < 1) {
-        throw new Error("INVALID_PAGINATION");
-      }
+  // =====================================
+  // CREATE
+  // =====================================
 
-      const { meter_readings, total } = await meterReadingRepository.findMany({
-        room_id,
-        contract_id,
-        page,
-        limit,
+  create: async (
+    created_by: bigint,
+    input: CreateMeterReadingInput
+  ) => {
+    try {
+      const user = await prisma.users.findUnique({
+        where: { id: created_by },
       });
 
+      if (!user) throw new Error("USER_NOT_FOUND");
+      if (user.status !== "ACTIVE") throw new Error("USER_INACTIVE");
+
+      // Chủ trọ tạo chỉ số bàn giao
+      if (input.type === "INITIAL_HANDOVER") {
+        if (user.role !== "LANDLORD") {
+          throw new Error("FORBIDDEN");
+        }
+
+        const electricity = input.readings.find(
+          (item) => item.meterType === "ELECTRICITY"
+        );
+
+        const water = input.readings.find(
+          (item) => item.meterType === "WATER"
+        );
+
+        if (!electricity || !water) {
+          throw new Error("INVALID_INITIAL_READINGS");
+        }
+
+        return await meterReadingRepository.createInitialReadings(
+          created_by,
+          {
+            roomId: input.roomId,
+            contractId: input.contractId,
+            readingDate: input.readingDate,
+            note: input.note,
+            electricity: {
+              serviceId: electricity.serviceId,
+              value: electricity.newValue,
+            },
+            water: {
+              serviceId: water.serviceId,
+              value: water.newValue,
+            },
+          }
+        );
+      }
+
+      // Người thuê gửi báo cáo hàng tháng
+      if (input.type === "MONTHLY_REPORT") {
+        if (user.role !== "TENANT") {
+          throw new Error("FORBIDDEN");
+        }
+
+        // 1. Kiểm tra phòng
+        const room = await meterReadingRepository.findRoomById(
+          input.roomId
+        );
+
+        if (!room) throw new Error("ROOM_NOT_FOUND");
+
+        // 2. Lấy hợp đồng ACTIVE
+        const contract =
+          await meterReadingRepository.findActiveContract(input.roomId);
+
+        if (!contract) throw new Error("ACTIVE_CONTRACT_NOT_FOUND");
+
+        // 3. Lấy profile
+        const profile =
+          await meterReadingRepository.findProfileByUserId(created_by);
+
+        if (!profile) throw new Error("PROFILE_NOT_FOUND");
+
+        // 4. Kiểm tra người thuê thuộc hợp đồng
+        const contractTenant =
+          await meterReadingRepository.findContractTenant(
+            contract.id,
+            profile.id
+          );
+
+        if (!contractTenant) throw new Error("NOT_CONTRACT_TENANT");
+
+        // 5. Kiểm tra thời gian gửi: ngày 1 - 3
+        const now = new Date();
+
+        if (now.getDate() < 1 || now.getDate() > 3) {
+          throw new Error("SUBMISSION_PERIOD_CLOSED");
+        }
+
+        const month = now.getMonth() + 1;
+        const year = now.getFullYear();
+
+        // 6. Kiểm tra loại đồng hồ
+        if (!meterTypes.includes(input.meterType)) {
+          throw new Error("INVALID_METER_TYPE");
+        }
+
+        // 7. Kiểm tra báo cáo cùng kỳ
+        const existing =
+          await meterReadingRepository.findExistingReading(
+            input.roomId,
+            contract.id,
+            input.meterType,
+            month,
+            year
+          );
+
+        if (existing) throw new Error("READING_ALREADY_SUBMITTED");
+
+        // 8. Lấy chỉ số APPROVED gần nhất
+        const latestReading =
+          await meterReadingRepository.findLatestApprovedReading(
+            input.roomId,
+            contract.id,
+            input.meterType
+          );
+
+        if (!latestReading) {
+          throw new Error("INITIAL_READING_NOT_FOUND");
+        }
+
+        // 9. Kiểm tra chỉ số mới
+        const oldValue = Number(latestReading.new_value);
+        const newValue = input.newValue;
+
+        if (
+          !Number.isFinite(newValue) ||
+          newValue < oldValue ||
+          newValue < 0
+        ) {
+          throw new Error("INVALID_READING_VALUE");
+        }
+
+        const consumption = newValue - oldValue;
+
+        // 10. Tạo báo cáo
+        return await meterReadingRepository.create(created_by, {
+          rooms: {
+            connect: { id: input.roomId },
+          },
+          rental_contracts: {
+            connect: { id: contract.id },
+          },
+          services: {
+            connect: { id: input.serviceId },
+          },
+          meter_type: input.meterType,
+          reading_date: input.readingDate,
+          old_value: oldValue,
+          new_value: newValue,
+          consumption,
+          image_url: input.imageUrl,
+          period_month: month,
+          period_year: year,
+          status: "PENDING",
+        });
+      }
+
+      throw new Error("INVALID_TYPE");
+    } catch (error) {
+      console.error("Error create meter_reading:", error);
+
+      const allowedErrors = [
+        "USER_NOT_FOUND",
+        "USER_INACTIVE",
+        "FORBIDDEN",
+        "INVALID_INITIAL_READINGS",
+        "INVALID_TYPE",
+        "ROOM_NOT_FOUND",
+        "ACTIVE_CONTRACT_NOT_FOUND",
+        "PROFILE_NOT_FOUND",
+        "NOT_CONTRACT_TENANT",
+        "SUBMISSION_PERIOD_CLOSED",
+        "INVALID_METER_TYPE",
+        "READING_ALREADY_SUBMITTED",
+        "INITIAL_READING_NOT_FOUND",
+        "INVALID_READING_VALUE",
+      ];
+
+      if (
+        error instanceof Error &&
+        allowedErrors.includes(error.message)
+      ) {
+        throw error;
+      }
+
+      throw new Error("SERVER_ERROR");
+    }
+  },
+
+  // =====================================
+  // GET 1: Chỉ số hiện tại của phòng
+  // =====================================
+
+  getCurrentReadings: async (roomId: bigint) => {
+    try {
+      const room = await meterReadingRepository.findRoomById(roomId);
+
+      if (!room) throw new Error("ROOM_NOT_FOUND");
+
+      const contract =
+        await meterReadingRepository.findActiveContract(roomId);
+
+      if (!contract) throw new Error("ACTIVE_CONTRACT_NOT_FOUND");
+
+      const readings = await Promise.all(
+        meterTypes.map(async (meterType) => {
+          const reading =
+            await meterReadingRepository.findLatestApprovedReading(
+              roomId,
+              contract.id,
+              meterType
+            );
+
+          if (!reading) {
+            return {
+              meterType,
+              currentValue: null,
+              readingDate: null,
+              source: null,
+            };
+          }
+
+          return {
+            meterType,
+            currentValue: Number(reading.new_value),
+            readingDate: reading.reading_date,
+            source:
+              reading.period_month === null &&
+              reading.period_year === null
+                ? "INITIAL_HANDOVER"
+                : "MONTHLY_REPORT",
+          };
+        })
+      );
+
       return {
-        data: meter_readings,
-        total,
-        page,
-        limit,
-        totalPage: Math.ceil(total / limit),
+        roomId,
+        contractId: contract.id,
+        readings,
       };
     } catch (error) {
-      if (error instanceof Error && error.message === "INVALID_PAGINATION") {
-        throw error;
-      }
+      console.error("Error get current meter readings:", error);
 
-      throw new Error("SERVER_ERROR");
-    }
-  },
-
-  // Lấy chi tiết chỉ số theo ID
-  getById: async (id: bigint): Promise<meter_readings> => {
-    try {
-      const meterReading = await meterReadingRepository.findById(id);
-
-      if (!meterReading) {
-        throw new Error("METER_READING_NOT_FOUND");
-      }
-
-      return meterReading;
-    } catch (error) {
       if (
         error instanceof Error &&
-        error.message === "METER_READING_NOT_FOUND"
+        ["ROOM_NOT_FOUND", "ACTIVE_CONTRACT_NOT_FOUND"].includes(
+          error.message
+        )
       ) {
         throw error;
       }
@@ -67,385 +298,257 @@ export const meterReadingService = {
     }
   },
 
-  // Tạo bản ghi chỉ số
-  createMeterReading: async (
-    input: Prisma.meter_readingsCreateInput,
-  ): Promise<meter_readings> => {
+  // =====================================
+  // GET 2: Chỉ số bàn giao của hợp đồng
+  // =====================================
+
+  getInitialReadings: async (contractId: bigint) => {
     try {
-      return await meterReadingRepository.createMeterReading(input);
+      const contract =
+        await meterReadingRepository.findContractById(contractId);
+
+      if (!contract) throw new Error("CONTRACT_NOT_FOUND");
+
+      const readings =
+        await meterReadingRepository.findInitialReadings(contractId);
+
+      return {
+        contractId,
+        readings: readings.map((reading) => ({
+          id: reading.id,
+          meterType: reading.meter_type,
+          oldValue: Number(reading.old_value),
+          newValue: Number(reading.new_value),
+          consumption: Number(reading.consumption),
+          readingDate: reading.reading_date,
+          note: reading.note,
+          serviceId: reading.service_id,
+        })),
+      };
     } catch (error) {
+      console.error("Error get initial meter readings:", error);
+
+      if (
+        error instanceof Error &&
+        error.message === "CONTRACT_NOT_FOUND"
+      ) {
+        throw error;
+      }
+
       throw new Error("SERVER_ERROR");
     }
   },
 
-  // Cập nhật bản ghi chỉ số
-  updateMeterReading: async (
+  // =====================================
+  // GET 3: Danh sách báo cáo theo kỳ
+  // =====================================
+
+  getReadingsByPeriod: async (
+    month: number,
+    year: number
+  ) => {
+    try {
+      // 1. Kiểm tra kỳ
+      if (
+        !Number.isInteger(month) ||
+        month < 1 ||
+        month > 12 ||
+        !Number.isInteger(year) ||
+        year < 2000
+      ) {
+        throw new Error("INVALID_PERIOD");
+      }
+
+      // 2. Lấy danh sách phòng và báo cáo trong kỳ
+      const [rooms, readings] = await Promise.all([
+        meterReadingRepository.findRoomsWithActiveContracts(),
+        meterReadingRepository.findReadingsByPeriod(month, year),
+      ]);
+
+      // 3. Nhóm báo cáo theo hợp đồng
+      const readingsByContract = new Map<string, typeof readings>();
+
+      for (const reading of readings) {
+        // Bỏ qua bản ghi không thuộc hợp đồng nào
+        if (reading.contract_id === null) continue;
+
+        const key = reading.contract_id.toString();
+        const current = readingsByContract.get(key) ?? [];
+
+        current.push(reading);
+        readingsByContract.set(key, current);
+      }
+
+      // 4. Ghép báo cáo vào từng phòng
+      const items = rooms.map((room) => {
+        const contract = room.rental_contracts[0];
+
+        if (!contract) {
+          throw new Error("ACTIVE_CONTRACT_NOT_FOUND");
+        }
+
+        const contractReadings =
+          readingsByContract.get(contract.id.toString()) ?? [];
+
+        const getLatestReading = (meterType: meter_type) => {
+          return (
+            contractReadings.find(
+              (reading) => reading.meter_type === meterType
+            ) ?? null
+          );
+        };
+
+        const electricity = getLatestReading("ELECTRICITY");
+        const water = getLatestReading("WATER");
+
+        const isSubmitted = (reading: typeof electricity) =>
+          reading !== null &&
+          (reading.status === "PENDING" ||
+            reading.status === "APPROVED");
+
+        const electricitySubmitted = isSubmitted(electricity);
+        const waterSubmitted = isSubmitted(water);
+
+        let status: "COMPLETED" | "PARTIAL" | "MISSING";
+
+        if (electricitySubmitted && waterSubmitted) {
+          status = "COMPLETED";
+        } else if (electricitySubmitted || waterSubmitted) {
+          status = "PARTIAL";
+        } else {
+          status = "MISSING";
+        }
+
+        const formatReading = (reading: typeof electricity) => {
+          if (!reading) return null;
+
+          return {
+            id: reading.id,
+            meterType: reading.meter_type,
+            oldValue: Number(reading.old_value),
+            newValue: Number(reading.new_value),
+            consumption: Number(reading.consumption),
+            readingDate: reading.reading_date,
+            status: reading.status,
+            imageUrl: reading.image_url,
+            note: reading.note,
+            submittedBy: reading.users?.id ?? null,
+          };
+        };
+
+        return {
+          roomId: room.id,
+          roomNumber: room.room_number,
+          contractId: contract.id,
+          tenants: contract.contract_tenants.map((tenant) => ({
+            profileId: tenant.profiles.id,
+            fullName: tenant.profiles.full_name,
+          })),
+          status,
+          readings: {
+            electricity: formatReading(electricity),
+            water: formatReading(water),
+          },
+        };
+      });
+
+      // 5. Thống kê
+      const summary = {
+        totalRooms: items.length,
+        completed: items.filter(
+          (item) => item.status === "COMPLETED"
+        ).length,
+        partial: items.filter(
+          (item) => item.status === "PARTIAL"
+        ).length,
+        missing: items.filter(
+          (item) => item.status === "MISSING"
+        ).length,
+      };
+
+      return {
+        month,
+        year,
+        summary,
+        items,
+      };
+    } catch (error) {
+      console.error("Error get meter readings by period:", error);
+
+      if (
+        error instanceof Error &&
+        error.message === "INVALID_PERIOD"
+      ) {
+        throw error;
+      }
+
+      throw new Error("SERVER_ERROR");
+    }
+  },
+
+  getById: async (id: bigint) => {
+    try {
+      const meter_reading = await meterReadingRepository.findById(id);
+      if (!meter_reading) throw new Error("METER_READING_NOT_FOUND");
+
+      return meter_reading;
+    } catch (error) {
+      console.log("Error get by id: "+ error)
+      if (error instanceof Error && error.message === "METER_READING_NOT_FOUND") {
+        throw error
+      }
+      throw new Error("SERVER_ERROR");
+    }
+  },
+
+    updateStatus: async (
     id: bigint,
-    input: Prisma.meter_readingsUpdateInput,
-  ): Promise<meter_readings> => {
+    status: "APPROVED" | "REJECTED",
+    note?: string
+  ) => {
     try {
-      const existingMeterReading = await meterReadingRepository.findById(id);
+      const reading = await meterReadingRepository.findById(id);
 
-      if (!existingMeterReading) {
+      if (!reading) {
         throw new Error("METER_READING_NOT_FOUND");
       }
 
-      return await meterReadingRepository.updateMeterReading(id, input);
+      if (reading.status !== "PENDING") {
+        throw new Error("METER_READING_ALREADY_PROCESSED");
+      }
+
+      if (status === "REJECTED" && !note?.trim()) {
+        throw new Error("REJECTION_REASON_REQUIRED");
+      }
+
+      const result = await meterReadingRepository.updatePendingStatus(
+        id,
+        status,
+        note?.trim()
+      );
+
+      if (result.count === 0) {
+        throw new Error("METER_READING_ALREADY_PROCESSED");
+      }
+
+      return {
+        id,
+        status,
+      };
     } catch (error) {
       if (
         error instanceof Error &&
-        error.message === "METER_READING_NOT_FOUND"
+        [
+          "METER_READING_NOT_FOUND",
+          "METER_READING_ALREADY_PROCESSED",
+          "REJECTION_REASON_REQUIRED",
+        ].includes(error.message)
       ) {
         throw error;
       }
 
-      throw new Error("SERVER_ERROR");
-    }
-  },
-
-  // Xóa bản ghi chỉ số
-  deleteMeterReading: async (id: bigint): Promise<meter_readings> => {
-    try {
-      const existingMeterReading = await meterReadingRepository.findById(id);
-
-      if (!existingMeterReading) {
-        throw new Error("METER_READING_NOT_FOUND");
-      }
-
-      return await meterReadingRepository.deleteMeterReading(id);
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message === "METER_READING_NOT_FOUND"
-      ) {
-        throw error;
-      }
-
+      console.error("Error updating meter reading status:", error);
       throw new Error("SERVER_ERROR");
     }
   },
 };
-
-// import { Prisma } from "@/generated/prisma/client";
-// import {
-//   meterReadingRepository,
-//   type FindManyParams,
-// } from "@/lib/api/repositories/meter_readings/meter_reading.repository";
-
-// export const meterReadingService = {
-//   // Lấy chi tiết chỉ số
-//   async getMeterReadingById(id: bigint) {
-//     const reading = await meterReadingRepository.findById(id);
-
-//     if (!reading) {
-//       throw new Error("Không tìm thấy bản ghi chỉ số.");
-//     }
-
-//     return reading;
-//   },
-
-//   // Lấy danh sách chỉ số có phân trang
-//   async getMeterReadings(params: FindManyParams) {
-//     const { page = 1, limit = 10 } = params;
-
-//     if (page < 1 || limit < 1 || limit > 100) {
-//       throw new Error("Thông tin phân trang không hợp lệ.");
-//     }
-
-//     const result = await meterReadingRepository.findMany(params);
-
-//     return {
-//       meter_readings: result.meter_readings,
-//       pagination: {
-//         page,
-//         limit,
-//         total: result.total,
-//         totalPages: Math.ceil(result.total / limit),
-//       },
-//     };
-//   },
-
-//   // Tạo chỉ số ban đầu khi bàn giao
-//   async createInitialMeterReading(input: {
-//     room_id: bigint;
-//     contract_id: bigint;
-//     service_id: bigint;
-//     meter_type: "WATER" | "ELECTRICITY";
-//     reading_date: Date;
-//     period_month: number;
-//     period_year: number;
-//     initial_value: Prisma.Decimal | string | number;
-//     image_url?: string | null;
-//     note?: string | null;
-//     created_by?: bigint | null;
-//   }) {
-//     const {
-//       room_id,
-//       contract_id,
-//       service_id,
-//       meter_type,
-//       reading_date,
-//       period_month,
-//       period_year,
-//       initial_value,
-//       image_url,
-//       note,
-//       created_by,
-//     } = input;
-
-//     if (
-//       !Number.isInteger(period_month) ||
-//       period_month < 1 ||
-//       period_month > 12 ||
-//       !Number.isInteger(period_year) ||
-//       period_year < 1
-//     ) {
-//       throw new Error("Tháng hoặc năm ghi chỉ số không hợp lệ.");
-//     }
-
-//     if (
-//       reading_date.getMonth() + 1 !== period_month ||
-//       reading_date.getFullYear() !== period_year
-//     ) {
-//       throw new Error("Ngày ghi chỉ số không khớp kỳ ghi chỉ số.");
-//     }
-
-//     const value = new Prisma.Decimal(initial_value);
-
-//     if (!value.isFinite() || value.isNegative()) {
-//       throw new Error("Chỉ số ban đầu phải là số không âm hợp lệ.");
-//     }
-
-//     const existing = await meterReadingRepository.findByRoomServicePeriod({
-//       room_id,
-//       service_id,
-//       period_month,
-//       period_year,
-//     });
-
-//     if (existing) {
-//       throw new Error("Chỉ số của dịch vụ trong kỳ này đã tồn tại.");
-//     }
-
-//     return meterReadingRepository.createMeterReading({
-//       rooms: { connect: { id: room_id } },
-//       rental_contracts: { connect: { id: contract_id } },
-//       services: { connect: { id: service_id } },
-//       ...(created_by != null && {
-//         users: { connect: { id: created_by } },
-//       }),
-//       meter_type,
-//       reading_date,
-//       period_month,
-//       period_year,
-//       old_value: value,
-//       new_value: value,
-//       consumption: new Prisma.Decimal(0),
-//       status: "APPROVED",
-//       image_url: image_url ?? null,
-//       note: note ?? null,
-//     });
-//   },
-
-//   // Người thuê gửi chỉ số mới
-//   async submitMeterReading(input: {
-//     room_id: bigint;
-//     contract_id: bigint;
-//     service_id: bigint;
-//     meter_type: "WATER" | "ELECTRICITY";
-//     reading_date: Date;
-//     period_month: number;
-//     period_year: number;
-//     new_value: Prisma.Decimal | string | number;
-//     image_url?: string | null;
-//     note?: string | null;
-//     created_by?: bigint | null;
-//   }) {
-//     const {
-//       room_id,
-//       contract_id,
-//       service_id,
-//       meter_type,
-//       reading_date,
-//       period_month,
-//       period_year,
-//       new_value,
-//       image_url,
-//       note,
-//       created_by,
-//     } = input;
-
-//     if (
-//       !Number.isInteger(period_month) ||
-//       period_month < 1 ||
-//       period_month > 12 ||
-//       !Number.isInteger(period_year) ||
-//       period_year < 1
-//     ) {
-//       throw new Error("Tháng hoặc năm ghi chỉ số không hợp lệ.");
-//     }
-
-//     if (
-//       reading_date.getMonth() + 1 !== period_month ||
-//       reading_date.getFullYear() !== period_year
-//     ) {
-//       throw new Error("Ngày ghi chỉ số không khớp kỳ ghi chỉ số.");
-//     }
-
-//     if (reading_date.getDate() < 1 || reading_date.getDate() > 4) {
-//       throw new Error("Chỉ được gửi chỉ số từ ngày 1 đến ngày 4.");
-//     }
-
-//     const value = new Prisma.Decimal(new_value);
-
-//     if (!value.isFinite() || value.isNegative()) {
-//       throw new Error("Chỉ số mới phải là số không âm hợp lệ.");
-//     }
-
-//     const existing = await meterReadingRepository.findByRoomServicePeriod({
-//       room_id,
-//       service_id,
-//       period_month,
-//       period_year,
-//     });
-
-//     if (existing) {
-//       throw new Error("Chỉ số của dịch vụ trong kỳ này đã tồn tại.");
-//     }
-
-//     const previous = await meterReadingRepository.findLatestApproved({
-//       room_id,
-//       service_id,
-//       reading_date,
-//     });
-
-//     if (!previous) {
-//       throw new Error("Chưa có chỉ số APPROVED trước đó.");
-//     }
-
-//     const oldValue = new Prisma.Decimal(previous.new_value);
-
-//     if (value.lessThan(oldValue)) {
-//       throw new Error("Chỉ số mới không được nhỏ hơn chỉ số cũ.");
-//     }
-
-//     return meterReadingRepository.createMeterReading({
-//       rooms: { connect: { id: room_id } },
-//       rental_contracts: { connect: { id: contract_id } },
-//       services: { connect: { id: service_id } },
-//       ...(created_by != null && {
-//         users: { connect: { id: created_by } },
-//       }),
-//       meter_type,
-//       reading_date,
-//       period_month,
-//       period_year,
-//       old_value: oldValue,
-//       new_value: value,
-//       consumption: value.minus(oldValue),
-//       status: "PENDING",
-//       image_url: image_url ?? null,
-//       note: note ?? null,
-//     });
-//   },
-
-//   // Duyệt hoặc từ chối chỉ số
-//   async reviewMeterReading(id: bigint, status: "APPROVED" | "REJECTED") {
-//     const reading = await this.getMeterReadingById(id);
-
-//     if (reading.status !== "PENDING") {
-//       throw new Error("Chỉ được duyệt bản ghi đang PENDING.");
-//     }
-
-//     return meterReadingRepository.updateMeterReading(id, {
-//       status,
-//     });
-//   },
-
-//   // Cập nhật chỉ số
-//   async updateMeterReading(
-//     id: bigint,
-//     input: {
-//       new_value?: Prisma.Decimal | string | number;
-//       reading_date?: Date;
-//       period_month?: number;
-//       period_year?: number;
-//       image_url?: string | null;
-//       note?: string | null;
-//     },
-//   ) {
-//     const reading = await this.getMeterReadingById(id);
-
-//     if (reading.status !== "PENDING" && reading.status !== "APPROVED") {
-//       throw new Error("Không thể cập nhật chỉ số ở trạng thái này.");
-//     }
-
-//     const newValue =
-//       input.new_value !== undefined
-//         ? new Prisma.Decimal(input.new_value)
-//         : new Prisma.Decimal(reading.new_value);
-
-//     const oldValue = new Prisma.Decimal(reading.old_value);
-
-//     if (
-//       !newValue.isFinite() ||
-//       newValue.isNegative() ||
-//       newValue.lessThan(oldValue)
-//     ) {
-//       throw new Error("Chỉ số mới không hợp lệ.");
-//     }
-
-//     const readingDate = input.reading_date ?? reading.reading_date;
-//     const month = input.period_month ?? reading.period_month;
-//     const year = input.period_year ?? reading.period_year;
-
-//     if (month == null || year == null) {
-//       throw new Error("Tháng hoặc năm ghi chỉ số không được để trống.");
-//     }
-
-//     if (
-//       !Number.isInteger(month) ||
-//       month < 1 ||
-//       month > 12 ||
-//       !Number.isInteger(year) ||
-//       year < 1 ||
-//       readingDate.getMonth() + 1 !== month ||
-//       readingDate.getFullYear() !== year
-//     ) {
-//       throw new Error("Ngày ghi chỉ số và kỳ ghi chỉ số không hợp lệ.");
-//     }
-
-//     return meterReadingRepository.updateMeterReading(id, {
-//       ...(input.new_value !== undefined && {
-//         new_value: newValue,
-//         consumption: newValue.minus(oldValue),
-//       }),
-//       ...(input.reading_date !== undefined && {
-//         reading_date: readingDate,
-//       }),
-//       ...(input.period_month !== undefined && {
-//         period_month: month,
-//       }),
-//       ...(input.period_year !== undefined && {
-//         period_year: year,
-//       }),
-//       ...(input.image_url !== undefined && {
-//         image_url: input.image_url,
-//       }),
-//       ...(input.note !== undefined && {
-//         note: input.note,
-//       }),
-//     });
-//   },
-
-//   // Xóa chỉ số chưa được duyệt hoặc đã bị từ chối
-//   async deleteMeterReading(id: bigint) {
-//     const reading = await this.getMeterReadingById(id);
-
-//     if (reading.status !== "PENDING" && reading.status !== "REJECTED") {
-//       throw new Error("Chỉ được xóa chỉ số PENDING hoặc REJECTED.");
-//     }
-
-//     return meterReadingRepository.deleteMeterReading(id);
-//   },
-// };

@@ -1,30 +1,71 @@
-import { RoomWithCurrentContract, RoomWithCurrentContractV2 } from "@/lib/api/repositories/rooms/rooms.repository";
+import {
+  RoomWithCurrentContract,
+  RoomWithCurrentContractV2,
+} from "@/lib/api/repositories/rooms/rooms.repository";
+
 import RoomDetail from "@/lib/components/landlord/rooms/RoomDetail";
 import { ApiResponse } from "@/lib/types/api.type";
+
+type CurrentMeterReading = {
+  meterType: "ELECTRICITY" | "WATER";
+  currentValue: number;
+  readingDate: string;
+  source: "INITIAL_HANDOVER" | "MONTHLY_REPORT";
+};
+
+type CurrentReadingsResponse = {
+  roomId: string;
+  contractId: string;
+  readings: CurrentMeterReading[];
+};
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }
-export default async function roomDetail({ params }: PageProps) {
-  // Lấy id
+
+export default async function RoomDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  // Gọi API
-  const res = await fetch(`${process.env.APP_URL}/api/landlord/rooms/${id}`, {
-    cache: "no-store",
-  });
+  const [roomRes, readingsRes] = await Promise.all([
+    fetch(`${process.env.APP_URL}/api/landlord/rooms/${id}`, {
+      cache: "no-store",
+    }),
 
-  if (!res.ok) {
+    fetch(
+      `${process.env.APP_URL}/api/landlord/rooms/${id}/meter_readings`,
+      {
+        cache: "no-store",
+      }
+    ),
+  ]);
+
+  if (!roomRes.ok) {
     return <div>Không thể lấy thông tin phòng.</div>;
   }
 
-  const result: ApiResponse<RoomWithCurrentContractV2> = await res.json();
-  if (!result.data) {
+  const roomResult: ApiResponse<RoomWithCurrentContract> =
+    await roomRes.json();
+
+  if (!roomResult.data) {
     return <div>Không thể lấy thông tin phòng.</div>;
+  }
+
+  let currentReadings: CurrentMeterReading[] = [];
+
+  if (readingsRes.ok) {
+    const readingsResult: ApiResponse<CurrentReadingsResponse> =
+      await readingsRes.json();
+
+    currentReadings =
+      readingsResult.data?.readings ?? [];
   }
 
   return (
-    <div className="p-3 sm:p-4 md:p-5 gap-y-4">
-      <RoomDetail room={result.data} />
+    <div className="gap-y-4 p-3 sm:p-4 md:p-5">
+      <RoomDetail
+        room={roomResult.data}
+        currentReadings={currentReadings}
+      />
     </div>
   );
 }
