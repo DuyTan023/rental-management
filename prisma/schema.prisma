@@ -137,6 +137,7 @@ model rental_contracts {
   contract_deposits          contract_deposits[]
   contract_price_adjustments contract_price_adjustments[]
   contract_tenants           contract_tenants[]
+  invoices                   invoices[]
   meter_readings             meter_readings[]
   rooms                      rooms                        @relation(fields: [room_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
@@ -202,6 +203,7 @@ model services {
   is_active          Boolean          @default(true)
   created_at         DateTime         @default(now()) @db.Timestamptz(6)
   updated_at         DateTime         @default(now()) @db.Timestamptz(6)
+  invoice_items      invoice_items[]
   meter_readings     meter_readings[]
   room_services      room_services[]
 }
@@ -225,12 +227,52 @@ model meter_readings {
   image_url        String?
   period_year      Int?                  @db.SmallInt
   period_month     Int?                  @db.SmallInt
+  invoice_items    invoice_items[]
   rental_contracts rental_contracts?     @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users            users?                @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   rooms            rooms                 @relation(fields: [room_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   services         services              @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([room_id, service_id, reading_date], map: "uq_meter_reading")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model invoice_items {
+  id               BigInt          @id @default(autoincrement())
+  invoice_id       BigInt
+  service_id       BigInt?
+  meter_reading_id BigInt?
+  description      String          @db.VarChar(255)
+  quantity         Decimal         @default(1) @db.Decimal(12, 2)
+  unit_price       Decimal         @db.Decimal(15, 2)
+  subtotal         Decimal         @db.Decimal(15, 2)
+  invoices         invoices        @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  meter_readings   meter_readings? @relation(fields: [meter_reading_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  services         services?       @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model invoices {
+  id               BigInt           @id @default(autoincrement())
+  contract_id      BigInt
+  invoice_number   String           @unique @db.VarChar(50)
+  billing_month    Int              @db.SmallInt
+  billing_year     Int
+  issue_date       DateTime         @default(dbgenerated("CURRENT_DATE")) @db.Date
+  due_date         DateTime         @db.Date
+  total_amount     Decimal          @default(0) @db.Decimal(15, 2)
+  paid_amount      Decimal          @default(0) @db.Decimal(15, 2)
+  status           invoice_status   @default(UNPAID)
+  pdf_url          String?
+  note             String?
+  created_at       DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime         @default(now()) @db.Timestamptz(6)
+  invoice_items    invoice_items[]
+  rental_contracts rental_contracts @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([contract_id, billing_month, billing_year], map: "uq_invoice_period")
 }
 
 enum account_role {
@@ -313,4 +355,12 @@ enum meter_reading_status {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum invoice_status {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
 }
