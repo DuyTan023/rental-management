@@ -297,6 +297,8 @@ model payments {
   note             String?
   created_at       DateTime       @default(now()) @db.Timestamptz(6)
   updated_at       DateTime       @default(now()) @db.Timestamptz(6)
+  proof_image_url  String?        @db.VarChar
+  rejection_reason String?
   users            users?         @relation(fields: [created_by], references: [id], onUpdate: NoAction)
   invoices         invoices       @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   profiles         profiles?      @relation(fields: [payer_profile_id], references: [id], onUpdate: NoAction)

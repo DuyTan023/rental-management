@@ -344,6 +344,13 @@ export default function InvoiceDetailPage() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
 
+  // Cash payment
+  const [cashDialogOpen, setCashDialogOpen] = useState(false);
+  const [cashAmount, setCashAmount] = useState("");
+  const [cashNote, setCashNote] = useState("");
+  const [cashLoading, setCashLoading] = useState(false);
+  const [cashError, setCashError] = useState("");
+
   // ====================================================
   // FETCH INVOICE
   // ====================================================
@@ -590,6 +597,81 @@ export default function InvoiceDetailPage() {
     }
   };
 
+
+  // ====================================================
+// CASH PAYMENT
+// ====================================================
+
+  const handleCashPayment = async () => {
+    const amount = cashAmount.trim();
+    const note = cashNote.trim();
+
+    setCashError("");
+
+    if (!amount) {
+      setCashError("Vui lòng nhập số tiền nhận được.");
+      return;
+    }
+
+    if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
+      setCashError("Số tiền không hợp lệ.");
+      return;
+    }
+
+    if (note.length > 1000) {
+      setCashError("Ghi chú không được vượt quá 1000 ký tự.");
+      return;
+    }
+
+    try {
+      setCashLoading(true);
+
+      const response = await fetch(
+        `/api/landlord/invoices/${encodeURIComponent(invoiceId)}/payments/cash`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            amount,
+            note: note || undefined,
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Không thể ghi nhận thanh toán.",
+        );
+      }
+
+      // Đóng dialog và reset form
+      setCashDialogOpen(false);
+      setCashAmount("");
+      setCashNote("");
+      setCashError("");
+
+      // Tải lại chi tiết hóa đơn và lịch sử thanh toán
+      await Promise.all([
+        fetchInvoice(),
+        fetchPayments(),
+      ]);
+    } catch (error) {
+      console.error("Cash payment:", error);
+
+      setCashError(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi ghi nhận thanh toán.",
+      );
+    } finally {
+      setCashLoading(false);
+    }
+  };
+
   // ====================================================
   // LOADING
   // ====================================================
@@ -721,6 +803,23 @@ export default function InvoiceDetailPage() {
 
             {exportingPdf ? "Đang xuất..." : "Xem hóa đơn PDF"}
           </button>
+
+          {invoice.status !== "CANCELLED" &&
+            remainingAmount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCashAmount("");
+                  setCashNote("");
+                  setCashError("");
+                  setCashDialogOpen(true);
+                }}
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-green-600 px-4 text-sm font-medium text-white hover:bg-green-700"
+              >
+                <Wallet className="size-4" />
+                Ghi nhận thanh toán
+              </button>
+            )}
         </div>
       </div>
 
@@ -1592,6 +1691,173 @@ export default function InvoiceDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+
+      
+        <Dialog
+          open={cashDialogOpen}
+          onOpenChange={(open) => {
+            if (cashLoading) return;
+
+            setCashDialogOpen(open);
+
+            if (!open) {
+              setCashError("");
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-[460px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <span className="flex size-9 items-center justify-center rounded-full bg-green-100 text-green-600">
+                  <Wallet className="size-5" />
+                </span>
+                Ghi nhận thanh toán tiền mặt
+              </DialogTitle>
+
+              <DialogDescription>
+                Ghi nhận khoản tiền chủ trọ đã thực tế nhận từ người thuê.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Invoice summary */}
+            <div className="space-y-2 rounded-lg bg-muted/40 p-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Mã hóa đơn</span>
+                <span className="font-medium">
+                  {invoice.invoice_number}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Tổng hóa đơn</span>
+                <span className="font-medium">
+                  {formatMoney(invoice.total_amount)}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Đã thanh toán</span>
+                <span className="font-medium text-green-600">
+                  {formatMoney(invoice.paid_amount)}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-3 border-t pt-2">
+                <span className="font-semibold">Còn phải thanh toán</span>
+                <span className="font-bold text-red-600">
+                  {formatMoney(remainingAmount)}
+                </span>
+              </div>
+            </div>
+
+            {/* Amount */}
+            <div className="space-y-2">
+              <Label htmlFor="cash-amount">
+                Số tiền nhận được <span className="text-red-500">*</span>
+              </Label>
+
+              <input
+                id="cash-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={cashAmount}
+                onChange={(event) => {
+                  setCashAmount(event.target.value);
+                  setCashError("");
+                }}
+                placeholder="Nhập số tiền"
+                disabled={cashLoading}
+                className="h-11 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
+              />
+
+              {cashAmount && Number(cashAmount) > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Số tiền: {formatMoney(cashAmount)}
+                </p>
+              )}
+
+              <button
+                type="button"
+                disabled={cashLoading || remainingAmount <= 0}
+                onClick={() => {
+                  setCashAmount(String(remainingAmount));
+                  setCashError("");
+                }}
+                className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+              >
+                Thanh toán toàn bộ số tiền còn lại
+              </button>
+            </div>
+
+            {/* Note */}
+            <div className="space-y-2">
+              <Label htmlFor="cash-note">Ghi chú</Label>
+
+              <Textarea
+                id="cash-note"
+                value={cashNote}
+                onChange={(event) => setCashNote(event.target.value)}
+                placeholder="Ví dụ: Thu tiền phòng tháng 11..."
+                rows={3}
+                maxLength={1000}
+                disabled={cashLoading}
+                className="resize-none"
+              />
+
+              <p className="text-right text-xs text-muted-foreground">
+                {cashNote.length}/1000
+              </p>
+            </div>
+
+            {/* Error */}
+            {cashError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{cashError}</span>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={cashLoading}
+                onClick={() => setCashDialogOpen(false)}
+              >
+                Đóng
+              </Button>
+
+              <Button
+                type="button"
+                disabled={
+                  cashLoading ||
+                  !cashAmount.trim() ||
+                  Number(cashAmount) <= 0
+                }
+                onClick={handleCashPayment}
+                className="bg-green-600 text-white hover:bg-green-700"
+              >
+                {cashLoading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="size-4" />
+                    Xác nhận đã nhận tiền
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
     </div>
   );
 }
