@@ -2,7 +2,7 @@
 
 import { Prisma } from "@/generated/prisma/client";
 import { invoiceRepository } from "@/lib/api/repositories/invoices/invoice.repository";
-
+import { randomUUID } from "node:crypto";
 export const invoiceService = {
   // Tạo khoảng thời gian của kỳ hóa đơn
   getBillingPeriod(billingMonth: number, billingYear: number) {
@@ -265,7 +265,8 @@ export const invoiceService = {
       );
 
       // Tạo mã hóa đơn
-      const invoiceNumber = `INV-${billingYear}${String(billingMonth).padStart(2, "0")}-${contractId}`;
+      const invoiceNumber =
+        `INV-${billingYear}${String(billingMonth).padStart(2, "0")}-${contractId}-${randomUUID().slice(0, 8).toUpperCase()}`;
 
       // Tạo hóa đơn và các chi tiết
       const invoice = await invoiceRepository.createWithItems({
@@ -369,4 +370,126 @@ export const invoiceService = {
       results,
     };
   },
+
+
+
+  async getInvoices(params: {
+    page?: number;
+    limit?: number;
+    month?: number;
+    year?: number;
+    keyword?: string;
+    status?: string;
+  }) {
+    const {
+      page = 1,
+      limit = 10,
+      month,
+      year,
+      keyword,
+      status,
+    } = params;
+
+    // Xây dựng điều kiện tìm kiếm
+    const where: Prisma.invoicesWhereInput = {};
+
+    // Lọc theo tháng
+    if (month !== undefined) {
+      where.billing_month = month;
+    }
+
+    // Lọc theo năm
+    if (year !== undefined) {
+      where.billing_year = year;
+    }
+
+    // Lọc theo trạng thái
+    if (status) {
+      where.status = status as Prisma.Enuminvoice_statusFilter["equals"];
+    }
+
+    // Tìm kiếm theo mã hóa đơn, phòng,
+    // hợp đồng và tên người thuê
+    if (keyword?.trim()) {
+      const search = keyword.trim();
+
+      where.OR = [
+        {
+          invoice_number: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          rental_contracts: {
+            contract_number: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          rental_contracts: {
+            rooms: {
+              room_number: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          },
+        },
+        {
+          rental_contracts: {
+            contract_tenants: {
+              some: {
+                profiles: {
+                  full_name: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+              },
+            },
+          },
+        },
+      ];
+    }
+
+    // Lấy danh sách và tổng số hóa đơn
+    const [items, total] = await invoiceRepository.findMany(
+      where,
+      page,
+      limit
+    );
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  },
+
+  async getInvoiceById(id: bigint) {
+    const invoice = await invoiceRepository.findById(id);
+
+    if (!invoice) {
+      throw new Error("Không tìm thấy hóa đơn");
+    }
+
+    // Tính số tiền còn phải thanh toán
+    // Không thay đổi dữ liệu trong database
+    const remainingAmount = new Prisma.Decimal(
+      invoice.total_amount
+    ).minus(invoice.paid_amount);
+
+    return {
+      ...invoice,
+      remaining_amount: remainingAmount,
+    };
+  },
+
 };

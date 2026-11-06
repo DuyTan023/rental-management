@@ -46,6 +46,7 @@ export default function Header() {
     { name: "Hợp đồng", href: "/landlord/rental_contracts" },
     { name: "Chỉ số điện nước", href: "/landlord/meter_readings" },
     { name: "Profile", href: "/public/user/profile" },
+    { name: "Hóa đơn", href: "/landlord/invoices" },
   ];
 
   const currentMenu = menuItems.find(

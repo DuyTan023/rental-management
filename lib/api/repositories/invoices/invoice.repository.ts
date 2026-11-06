@@ -89,12 +89,13 @@ export const invoiceRepository = {
     billingMonth: number,
     billingYear: number,
   ) {
-    return prisma.invoices.findUnique({
+    return prisma.invoices.findFirst({
       where: {
-        contract_id_billing_month_billing_year: {
-          contract_id: contractId,
-          billing_month: billingMonth,
-          billing_year: billingYear,
+        contract_id: contractId,
+        billing_month: billingMonth,
+        billing_year: billingYear,
+        status: {
+          not: "CANCELLED",
         },
       },
     });
@@ -106,6 +107,78 @@ export const invoiceRepository = {
       data,
       include: {
         invoice_items: true,
+      },
+    });
+  },
+
+  //Lấy danh sách hóa đơn
+  findMany(
+    where: Prisma.invoicesWhereInput,
+    page: number,
+    limit: number
+  ) {
+    return prisma.$transaction([
+      prisma.invoices.findMany({
+        where,
+        include: {
+          rental_contracts: {
+            include: {
+              rooms: true,
+              contract_tenants: {
+                where: {
+                  role: "REPRESENTATIVE",
+                },
+                include: {
+                  profiles: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [
+          {
+            issue_date: "desc",
+          },
+          {
+            id: "desc",
+          },
+        ],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+
+      prisma.invoices.count({
+        where,
+      }),
+    ]);
+  },
+
+  findById(id: bigint) {
+    return prisma.invoices.findUnique({
+      where: {
+        id,
+      },
+      include: {
+        rental_contracts: {
+          include: {
+            rooms: true,
+            contract_tenants: {
+              include: {
+                profiles: true,
+              },
+            },
+          },
+        },
+
+        invoice_items: {
+          include: {
+            services: true,
+            meter_readings: true,
+          },
+          orderBy: {
+            id: "asc",
+          },
+        },
       },
     });
   },

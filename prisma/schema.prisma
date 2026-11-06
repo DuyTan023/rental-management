@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -34,6 +35,7 @@ model users {
   invitations          invitations[]
   meter_readings       meter_readings[]
   password_reset_otps  password_reset_otps[]
+  payments             payments[]
   profiles             profiles?
 }
 
@@ -52,6 +54,7 @@ model profiles {
   created_at       DateTime           @default(now()) @db.Timestamptz(6)
   updated_at       DateTime           @default(now()) @db.Timestamptz(6)
   contract_tenants contract_tenants[]
+  payments         payments[]
   users            users?             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
@@ -255,24 +258,48 @@ model invoice_items {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model invoices {
-  id               BigInt           @id @default(autoincrement())
-  contract_id      BigInt
-  invoice_number   String           @unique @db.VarChar(50)
-  billing_month    Int              @db.SmallInt
-  billing_year     Int
-  issue_date       DateTime         @default(dbgenerated("CURRENT_DATE")) @db.Date
-  due_date         DateTime         @db.Date
-  total_amount     Decimal          @default(0) @db.Decimal(15, 2)
-  paid_amount      Decimal          @default(0) @db.Decimal(15, 2)
-  status           invoice_status   @default(UNPAID)
-  pdf_url          String?
-  note             String?
-  created_at       DateTime         @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime         @default(now()) @db.Timestamptz(6)
-  invoice_items    invoice_items[]
-  rental_contracts rental_contracts @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id                  BigInt           @id @default(autoincrement())
+  contract_id         BigInt
+  invoice_number      String           @unique @db.VarChar(50)
+  billing_month       Int              @db.SmallInt
+  billing_year        Int
+  issue_date          DateTime         @default(dbgenerated("CURRENT_DATE")) @db.Date
+  due_date            DateTime         @db.Date
+  total_amount        Decimal          @default(0) @db.Decimal(15, 2)
+  paid_amount         Decimal          @default(0) @db.Decimal(15, 2)
+  status              invoice_status   @default(UNPAID)
+  pdf_url             String?
+  note                String?
+  created_at          DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime         @default(now()) @db.Timestamptz(6)
+  cancelled_at        DateTime?        @db.Timestamptz(6)
+  cancellation_reason String?
+  invoice_items       invoice_items[]
+  rental_contracts    rental_contracts @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payments            payments[]
 
-  @@unique([contract_id, billing_month, billing_year], map: "uq_invoice_period")
+  @@unique([contract_id, billing_month, billing_year], map: "uq_invoice_period_active", where: raw("(status <> 'CANCELLED'::invoice_status)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model payments {
+  id               BigInt         @id @default(autoincrement())
+  invoice_id       BigInt
+  payer_profile_id BigInt?
+  created_by       BigInt?
+  amount           Decimal        @db.Decimal(15, 2)
+  payment_method   payment_method
+  status           payment_status @default(PENDING)
+  transaction_ref  String?        @db.VarChar(150)
+  payos_order_code String?        @unique @db.VarChar(100)
+  payment_date     DateTime?      @db.Timestamptz(6)
+  note             String?
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime       @default(now()) @db.Timestamptz(6)
+  users            users?         @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  invoices         invoices       @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profiles         profiles?      @relation(fields: [payer_profile_id], references: [id], onUpdate: NoAction)
 }
 
 enum account_role {
@@ -363,4 +390,18 @@ enum invoice_status {
   PAID
   OVERDUE
   CANCELLED
+}
+
+enum payment_method {
+  CASH
+  BANK_TRANSFER
+  PAYOS
+}
+
+enum payment_status {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
 }
