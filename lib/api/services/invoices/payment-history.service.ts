@@ -136,6 +136,8 @@ export const paymentHistoryService = {
         note: payment.note,
         created_at: payment.created_at.toISOString(),
         updated_at: payment.updated_at.toISOString(),
+        proof_image_url: payment.proof_image_url,
+        rejection_reason: payment.rejection_reason,
       })),
 
       pagination: {

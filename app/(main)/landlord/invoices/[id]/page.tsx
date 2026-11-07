@@ -147,6 +147,8 @@ type Payment = {
   note: string | null;
   created_at: string;
   updated_at: string;
+  proof_image_url: string | null;
+  rejection_reason: string | null;
 };
 
 type PaymentHistoryData = {
@@ -350,6 +352,16 @@ export default function InvoiceDetailPage() {
   const [cashNote, setCashNote] = useState("");
   const [cashLoading, setCashLoading] = useState(false);
   const [cashError, setCashError] = useState("");
+
+  // Bank transfer review
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+
+  const [confirmBankDialogOpen, setConfirmBankDialogOpen] = useState(false);
+  const [rejectBankDialogOpen, setRejectBankDialogOpen] = useState(false);
+
+  const [rejectReason, setRejectReason] = useState("");
+  const [bankActionLoading, setBankActionLoading] = useState(false);
+  const [bankActionError, setBankActionError] = useState("");
 
   // ====================================================
   // FETCH INVOICE
@@ -669,6 +681,94 @@ export default function InvoiceDetailPage() {
       );
     } finally {
       setCashLoading(false);
+    }
+  };
+
+  const handleConfirmBankTransfer = async () => {
+    if (!selectedPayment) return;
+
+    try {
+      setBankActionLoading(true);
+      setBankActionError("");
+
+      const response = await fetch(
+        `/api/landlord/payments/${encodeURIComponent(selectedPayment.id)}/confirm`,
+        { method: "PATCH" }
+      );
+
+      const result = await response.json();
+
+      // API confirm hiện tại trả message + data, không có success.
+      if (!response.ok) {
+        throw new Error(result.message || "Không thể xác nhận giao dịch.");
+      }
+
+      setConfirmBankDialogOpen(false);
+      setSelectedPayment(null);
+
+      await Promise.all([fetchInvoice(), fetchPayments()]);
+    } catch (error) {
+      console.error("Confirm bank transfer:", error);
+      setBankActionError(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi xác nhận giao dịch."
+      );
+    } finally {
+      setBankActionLoading(false);
+    }
+  };
+
+  const handleRejectBankTransfer = async () => {
+    if (!selectedPayment) return;
+
+    const reason = rejectReason.trim();
+
+    if (!reason) {
+      setBankActionError("Vui lòng nhập lý do từ chối.");
+      return;
+    }
+
+    if (reason.length > 1000) {
+      setBankActionError("Lý do từ chối không được vượt quá 1000 ký tự.");
+      return;
+    }
+
+    try {
+      setBankActionLoading(true);
+      setBankActionError("");
+
+      const response = await fetch(
+        `/api/landlord/payments/${encodeURIComponent(selectedPayment.id)}/reject`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ reason }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Không thể từ chối giao dịch.");
+      }
+
+      setRejectBankDialogOpen(false);
+      setSelectedPayment(null);
+      setRejectReason("");
+
+      await Promise.all([fetchInvoice(), fetchPayments()]);
+    } catch (error) {
+      console.error("Reject bank transfer:", error);
+      setBankActionError(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi từ chối giao dịch."
+      );
+    } finally {
+      setBankActionLoading(false);
     }
   };
 
@@ -1020,6 +1120,9 @@ export default function InvoiceDetailPage() {
                   </th>
                   <th className="p-3 text-right font-medium">
                     Thành tiền
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium">
+                    Thao tác
                   </th>
                 </tr>
               </thead>
@@ -1409,6 +1512,45 @@ export default function InvoiceDetailPage() {
                             status={payment.status}
                           />
                         </td>
+
+
+                        <td className="px-4 py-3 text-center">
+                          {payment.payment_method === "BANK_TRANSFER" &&
+                          payment.status === "PENDING" ? (
+                            <div className="flex justify-center gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="bg-green-600 text-white hover:bg-green-700"
+                                onClick={() => {
+                                  setSelectedPayment(payment);
+                                  setBankActionError("");
+                                  setConfirmBankDialogOpen(true);
+                                }}
+                              >
+                                <CheckCircle2 className="mr-1 size-4" />
+                                Xác nhận
+                              </Button>
+
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => {
+                                  setSelectedPayment(payment);
+                                  setRejectReason("");
+                                  setBankActionError("");
+                                  setRejectBankDialogOpen(true);
+                                }}
+                              >
+                                <Ban className="mr-1 size-4" />
+                                Từ chối
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1419,9 +1561,13 @@ export default function InvoiceDetailPage() {
 
               <div className="space-y-2">
                 {paymentData.payments.map((payment) => (
-                  (payment.transaction_ref ||
-                    payment.payos_order_code ||
-                    payment.note) && (
+                  (
+                      payment.transaction_ref ||
+                      payment.payos_order_code ||
+                      payment.proof_image_url ||
+                      payment.rejection_reason ||
+                      payment.note
+                    ) && (
                     <details
                       key={`detail-${payment.id}`}
                       className="rounded-lg border px-4 py-3"
@@ -1456,6 +1602,37 @@ export default function InvoiceDetailPage() {
                             </p>
                           </div>
                         )}
+
+                        {payment.proof_image_url && (
+                            <div className="sm:col-span-2 space-y-2">
+                              <p className="text-muted-foreground">Ảnh minh chứng chuyển khoản</p>
+
+                              <a
+                                href={payment.proof_image_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block"
+                              >
+                                <img
+                                  src={payment.proof_image_url}
+                                  alt="Ảnh minh chứng chuyển khoản"
+                                  className="max-h-72 max-w-full rounded-lg border object-contain"
+                                />
+                                <span className="mt-1 block text-xs text-blue-600 hover:underline">
+                                  Mở ảnh kích thước đầy đủ
+                                </span>
+                              </a>
+                            </div>
+                          )}
+
+                          {payment.rejection_reason && (
+                            <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 p-3">
+                              <p className="font-medium text-red-700">Lý do từ chối</p>
+                              <p className="mt-1 whitespace-pre-wrap text-sm text-red-600">
+                                {payment.rejection_reason}
+                              </p>
+                            </div>
+                          )}
                       </div>
                     </details>
                   )
@@ -1857,6 +2034,262 @@ export default function InvoiceDetailPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+
+      <Dialog
+  open={confirmBankDialogOpen}
+  onOpenChange={(open) => {
+    if (bankActionLoading) return;
+
+    setConfirmBankDialogOpen(open);
+
+    if (!open) {
+      setBankActionError("");
+    }
+  }}
+>
+  <DialogContent className="sm:max-w-[460px]">
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2">
+        <CheckCircle2 className="size-5 text-green-600" />
+        Xác nhận chuyển khoản
+      </DialogTitle>
+
+      <DialogDescription>
+        Xác nhận bạn đã kiểm tra và thực tế nhận được khoản tiền này.
+      </DialogDescription>
+    </DialogHeader>
+
+    {/* {selectedPayment && (
+      <div className="space-y-3 rounded-lg bg-muted/40 p-4 text-sm">
+        <InfoRow
+          label="Mã giao dịch"
+          value={selectedPayment.transaction_ref || "—"}
+        />
+        <InfoRow
+          label="Người thanh toán"
+          value={selectedPayment.payer?.full_name || "Không xác định"}
+        />
+        <InfoRow
+          label="Số tiền"
+          value={formatMoney(selectedPayment.amount)}
+        />
+        <InfoRow
+          label="Ngày thanh toán"
+          value={formatDateTime(selectedPayment.payment_date)}
+        />
+      </div>
+    )} */}
+
+          {selectedPayment && (
+  <div className="space-y-3 rounded-lg bg-muted/40 p-4 text-sm">
+    <InfoRow
+      label="Mã giao dịch"
+      value={selectedPayment.transaction_ref || "—"}
+    />
+
+    <InfoRow
+      label="Người thanh toán"
+      value={selectedPayment.payer?.full_name || "Không xác định"}
+    />
+
+    <InfoRow
+      label="Số điện thoại"
+      value={selectedPayment.payer?.phone || "—"}
+    />
+
+    <InfoRow
+      label="Số tiền"
+      value={formatMoney(selectedPayment.amount)}
+    />
+
+    <InfoRow
+      label="Ngày thanh toán"
+      value={formatDateTime(selectedPayment.payment_date)}
+    />
+
+    {/* Ảnh minh chứng */}
+<div className="border-t pt-3">
+  <p className="mb-2 font-medium">Ảnh minh chứng chuyển khoản</p>
+
+  {selectedPayment.proof_image_url ? (
+    <a
+      href={selectedPayment.proof_image_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mx-auto block w-full max-w-[320px]"
+    >
+      <img
+        src={selectedPayment.proof_image_url}
+        alt="Ảnh minh chứng chuyển khoản"
+        className="h-[180px] w-full rounded-lg border bg-white object-contain"
+      />
+
+      <span className="mt-2 block text-center text-xs text-blue-600 hover:underline">
+        Nhấn để xem ảnh kích thước đầy đủ
+      </span>
+    </a>
+  ) : (
+    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+      Không có ảnh minh chứng.
+    </div>
+  )}
+</div>
+  </div>
+)}
+
+    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+      Sau khi xác nhận, giao dịch chuyển sang thành công và số tiền sẽ được
+      cộng vào hóa đơn.
+    </div>
+
+    {bankActionError && confirmBankDialogOpen && (
+      <div
+        role="alert"
+        className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600"
+      >
+        {bankActionError}
+      </div>
+    )}
+
+    <DialogFooter>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={bankActionLoading}
+        onClick={() => setConfirmBankDialogOpen(false)}
+      >
+        Hủy
+      </Button>
+
+      <Button
+        type="button"
+        disabled={bankActionLoading || !selectedPayment}
+        onClick={handleConfirmBankTransfer}
+        className="bg-green-600 text-white hover:bg-green-700"
+      >
+        {bankActionLoading ? (
+          <>
+            <Loader2 className="size-4 animate-spin" />
+            Đang xác nhận...
+          </>
+        ) : (
+          <>
+            <CheckCircle2 className="size-4" />
+            Xác nhận thanh toán
+          </>
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+      </Dialog>
+      
+
+      <Dialog
+  open={rejectBankDialogOpen}
+  onOpenChange={(open) => {
+    if (bankActionLoading) return;
+
+    setRejectBankDialogOpen(open);
+
+    if (!open) {
+      setBankActionError("");
+    }
+  }}
+>
+  <DialogContent className="sm:max-w-[460px]">
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2">
+        <Ban className="size-5 text-red-600" />
+        Từ chối giao dịch
+      </DialogTitle>
+
+      <DialogDescription>
+        Vui lòng kiểm tra giao dịch và nhập lý do từ chối.
+      </DialogDescription>
+    </DialogHeader>
+
+    {selectedPayment && (
+      <div className="space-y-2 rounded-lg bg-muted/40 p-4 text-sm">
+        <InfoRow
+          label="Người thanh toán"
+          value={selectedPayment.payer?.full_name || "Không xác định"}
+        />
+        <InfoRow
+          label="Số tiền"
+          value={formatMoney(selectedPayment.amount)}
+        />
+        <InfoRow
+          label="Mã giao dịch"
+          value={selectedPayment.transaction_ref || "—"}
+        />
+      </div>
+    )}
+
+    <div className="space-y-2">
+      <Label htmlFor="bank-reject-reason">
+        Lý do từ chối <span className="text-red-500">*</span>
+      </Label>
+
+      <Textarea
+        id="bank-reject-reason"
+        value={rejectReason}
+        onChange={(event) => {
+          setRejectReason(event.target.value);
+          setBankActionError("");
+        }}
+        placeholder="Ví dụ: Không tìm thấy giao dịch trong tài khoản ngân hàng..."
+        rows={4}
+        maxLength={1000}
+        disabled={bankActionLoading}
+        className="resize-none"
+      />
+
+      <p className="text-right text-xs text-muted-foreground">
+        {rejectReason.length}/1000
+      </p>
+    </div>
+
+    {bankActionError && rejectBankDialogOpen && (
+      <div
+        role="alert"
+        className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600"
+      >
+        {bankActionError}
+      </div>
+    )}
+
+    <DialogFooter>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={bankActionLoading}
+        onClick={() => setRejectBankDialogOpen(false)}
+      >
+        Hủy
+      </Button>
+
+      <Button
+        type="button"
+        variant="destructive"
+        disabled={bankActionLoading || !rejectReason.trim()}
+        onClick={handleRejectBankTransfer}
+      >
+        {bankActionLoading ? (
+          <>
+            <Loader2 className="size-4 animate-spin" />
+            Đang xử lý...
+          </>
+        ) : (
+          <>
+            <Ban className="size-4" />
+            Xác nhận từ chối
+          </>
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
     </div>
   );
