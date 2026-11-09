@@ -312,7 +312,7 @@ export default function TenantPaymentsPage() {
       transaction_ref: "",
       payment_date: getToday(),
       proof_image_url: "",
-      note: "",
+      note: `Thanh toán tiền phòng ${invoice.rental_contracts.rooms.room_number} kỳ ${invoice.billing_month}-${invoice.billing_year}`,
     });
 
     setFormError("");

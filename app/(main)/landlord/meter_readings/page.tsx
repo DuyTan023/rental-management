@@ -137,6 +137,39 @@ function getTenantNames(room: RoomReading) {
   return room.tenants.map((tenant) => tenant.fullName).join(", ");
 }
 
+function getApprovalStatus(room: RoomReading) {
+  const electricity = room.readings.electricity;
+  const water = room.readings.water;
+
+  if (!electricity && !water) {
+    return {
+      label: "Chưa có báo cáo",
+      className: "bg-gray-100 text-gray-700",
+    };
+  }
+
+  const readings = [electricity, water].filter(Boolean);
+
+  if (readings.some((item) => item!.status === "REJECTED")) {
+    return {
+      label: "Bị từ chối",
+      className: "bg-red-100 text-red-700",
+    };
+  }
+
+  if (readings.every((item) => item!.status === "APPROVED")) {
+    return {
+      label: "Đã duyệt",
+      className: "bg-green-100 text-green-700",
+    };
+  }
+
+  return {
+    label: "Chưa duyệt",
+    className: "bg-amber-100 text-amber-700",
+  };
+}
+
 // ==================== MAIN COMPONENT ====================
 
 export default function MeterReadingsPage() {
@@ -539,7 +572,7 @@ export default function MeterReadingsPage() {
         )}
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-sm">
+          <table className="w-full min-w-[950px] text-sm">
             <thead className="bg-muted/50 text-left">
               <tr>
                 <th className="w-12 p-4">
@@ -558,6 +591,7 @@ export default function MeterReadingsPage() {
                 <th className="p-4 font-medium">Điện</th>
                 <th className="p-4 font-medium">Nước</th>
                 <th className="p-4 font-medium">Tiến độ</th>
+                <th className="p-4 font-medium">Trạng thái duyệt</th>
                 <th className="p-4 text-right font-medium">Chi tiết</th>
               </tr>
             </thead>
@@ -638,6 +672,20 @@ export default function MeterReadingsPage() {
                         </span>
                       </td>
 
+                      <td className="p-4">
+                          {(() => {
+                            const approval = getApprovalStatus(room);
+
+                            return (
+                              <span
+                                className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${approval.className}`}
+                              >
+                                {approval.label}
+                              </span>
+                            );
+                          })()}
+                        </td>
+
                       <td className="p-4 text-right">
                         <Link
                           href={`/landlord/meter_readings/${room.roomId}?month=${month}&year=${year}`}
@@ -655,7 +703,7 @@ export default function MeterReadingsPage() {
               {!loading && filteredItems.length === 0 && !error && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={8}
                     className="p-8 text-center text-muted-foreground"
                   >
                     Không tìm thấy phòng phù hợp.

@@ -906,11 +906,11 @@ export default function InvoiceDetailPage() {
 
           {invoice.status !== "CANCELLED" &&
             remainingAmount > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCashAmount("");
-                  setCashNote("");
+            <button
+              type="button"
+              onClick={() => {
+                setCashAmount("");
+                setCashNote(`Thanh toán Phòng ${invoice.rental_contracts.rooms.room_number} Kỳ ${invoice.billing_month}-${invoice.billing_year}`);
                   setCashError("");
                   setCashDialogOpen(true);
                 }}
@@ -2060,27 +2060,6 @@ export default function InvoiceDetailPage() {
       </DialogDescription>
     </DialogHeader>
 
-    {/* {selectedPayment && (
-      <div className="space-y-3 rounded-lg bg-muted/40 p-4 text-sm">
-        <InfoRow
-          label="Mã giao dịch"
-          value={selectedPayment.transaction_ref || "—"}
-        />
-        <InfoRow
-          label="Người thanh toán"
-          value={selectedPayment.payer?.full_name || "Không xác định"}
-        />
-        <InfoRow
-          label="Số tiền"
-          value={formatMoney(selectedPayment.amount)}
-        />
-        <InfoRow
-          label="Ngày thanh toán"
-          value={formatDateTime(selectedPayment.payment_date)}
-        />
-      </div>
-    )} */}
-
           {selectedPayment && (
   <div className="space-y-3 rounded-lg bg-muted/40 p-4 text-sm">
     <InfoRow
@@ -2091,6 +2070,11 @@ export default function InvoiceDetailPage() {
     <InfoRow
       label="Người thanh toán"
       value={selectedPayment.payer?.full_name || "Không xác định"}
+    />
+              
+    <InfoRow
+      label="Kỳ thanh toán"
+      value={selectedPayment.note || "Không xác định"}
     />
 
     <InfoRow
