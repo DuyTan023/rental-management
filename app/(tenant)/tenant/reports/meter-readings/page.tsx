@@ -226,7 +226,14 @@ export default function TenantMeterReadingsPage() {
       return b.year - a.year || b.month - a.month;
     });
   }, [data?.history]);
+  
+    const now = new Date();
 
+    const readingDate = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("-");
   // Gửi báo cáo
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>
@@ -285,6 +292,9 @@ export default function TenantMeterReadingsPage() {
           meterType,
           periodMonth,
           periodYear,
+          // Ngày thực tế gửi báo cáo
+          readingDate,
+
           newValue: value,
           imageUrl,
         }),
@@ -677,7 +687,14 @@ export default function TenantMeterReadingsPage() {
 
             {!imageUrl ? (
               <CldUploadWidget
-                uploadPreset={process.env.CLOUDINARY_UPLOAD_PRESET!}
+                 config={{
+                      cloud: {
+                        cloudName: "tpreemmc",
+                      },
+                    }}
+                uploadPreset={
+                    process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!
+                  }
                 options={{
                   sources: ["local"],
                   multiple: false,
@@ -740,12 +757,12 @@ export default function TenantMeterReadingsPage() {
 
                 <CldUploadWidget
                   config={{
-                    cloud: {
-                      cloudName: "tpreemmc",
-                    },
-                  }}
+                      cloud: {
+                        cloudName: "tpreemmc",
+                      },
+                    }}
                   uploadPreset={
-                    process.env.CLOUDINARY_UPLOAD_PRESET!
+                    process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!
                   }
                   options={{
                     sources: ["local"],

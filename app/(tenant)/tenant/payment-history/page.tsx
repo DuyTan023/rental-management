@@ -23,7 +23,7 @@ type PaymentStatus =
   | "CANCELLED"
   | "REFUNDED";
 
-type PaymentMethod = "CASH" | "BANK_TRANSFER" | "PAYOS";
+type PaymentMethod = "CASH" | "BANK_TRANSFER";
 
 type Payment = {
   id: string;
@@ -93,7 +93,6 @@ const paymentStatusLabels: Record<PaymentStatus, string> = {
 const paymentMethodLabels: Record<PaymentMethod, string> = {
   CASH: "Tiền mặt",
   BANK_TRANSFER: "Chuyển khoản",
-  PAYOS: "PayOS",
 };
 
 const statusStyles: Record<PaymentStatus, string> = {
@@ -320,6 +319,7 @@ export default function TenantPaymentHistoryPage() {
                   <tr>
                     <th className="px-4 py-3 font-medium">Mã giao dịch</th>
                     <th className="px-4 py-3 font-medium">Hóa đơn</th>
+                    <th className="px-4 py-3 font-medium">Kỳ thanh toán</th>
                     <th className="px-4 py-3 font-medium">Số tiền</th>
                     <th className="px-4 py-3 font-medium">Phương thức</th>
                     <th className="px-4 py-3 font-medium">Ngày thanh toán</th>
@@ -334,7 +334,7 @@ export default function TenantPaymentHistoryPage() {
                   {payments.map((payment) => (
                     <tr key={payment.id} className="hover:bg-muted/30">
                       <td className="px-4 py-4 font-medium">
-                        {payment.transaction_ref || `#${payment.id}`}
+                        {payment.transaction_ref || `TM-${payment.id}`}
                       </td>
 
                       <td className="px-4 py-4">
@@ -349,6 +349,12 @@ export default function TenantPaymentHistoryPage() {
                           {payment.invoice?.billing_year}
                         </p>
                       </td>
+
+                      <td className="whitespace-nowrap px-4 py-4 font-semibold">
+                          {payment.invoice
+                            ? `${String(payment.invoice.billing_month).padStart(2, "0")}-${payment.invoice.billing_year}`
+                            : "—"}
+                        </td>
 
                       <td className="whitespace-nowrap px-4 py-4 font-semibold">
                         {formatMoney(payment.amount)}

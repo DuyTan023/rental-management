@@ -841,8 +841,13 @@ export default function TenantPaymentsPage() {
                 <Label>Ảnh minh chứng chuyển khoản *</Label>
 
                 <CldUploadWidget
+                   config={{
+                      cloud: {
+                        cloudName: "tpreemmc",
+                      },
+                    }}
                   uploadPreset={
-                    process.env.CLOUDINARY_UPLOAD_PRESET!
+                    process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!
                   }
                   options={{
                     sources: ["local"],

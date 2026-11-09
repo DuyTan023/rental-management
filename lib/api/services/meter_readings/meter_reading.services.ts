@@ -24,14 +24,16 @@ export type CreateMeterReadingInput =
       ];
     }
   | {
-      type: "MONTHLY_REPORT";
-      roomId: bigint;
-      serviceId: bigint;
-      meterType: meter_type;
-      readingDate: Date;
-      newValue: number;
-      imageUrl: string;
-    };
+    type: "MONTHLY_REPORT";
+    roomId: bigint;
+    serviceId: bigint;
+    meterType: meter_type;
+    readingDate: Date;
+    periodMonth: number;
+    periodYear: number;
+    newValue: number;
+    imageUrl: string;
+  };
 
 const meterTypes: meter_type[] = ["ELECTRICITY", "WATER"];
 
@@ -144,8 +146,17 @@ export const meterReadingService = {
 
 
 
-        const month = now.getMonth() + 1;
-        const year = now.getFullYear();
+        const { periodMonth, periodYear } = input;
+
+        if (
+          !Number.isInteger(periodMonth) ||
+          periodMonth < 1 ||
+          periodMonth > 12 ||
+          !Number.isInteger(periodYear) ||
+          periodYear < 2000
+        ) {
+          throw new Error("INVALID_PERIOD");
+        }
 
         // 6. Kiểm tra loại đồng hồ
         if (!meterTypes.includes(input.meterType)) {
@@ -153,14 +164,14 @@ export const meterReadingService = {
         }
 
         // 7. Kiểm tra báo cáo cùng kỳ
-        const existing =
-          await meterReadingRepository.findExistingReading(
-            input.roomId,
-            contract.id,
-            input.meterType,
-            month,
-            year
-          );
+      const existing =
+        await meterReadingRepository.findExistingReading(
+          input.roomId,
+          contract.id,
+          input.meterType,
+          periodMonth,
+          periodYear
+        );
 
         if (existing) throw new Error("READING_ALREADY_SUBMITTED");
 
@@ -188,7 +199,6 @@ export const meterReadingService = {
           throw new Error("INVALID_READING_VALUE");
         }
 
-        const consumption = newValue - oldValue;
 
         // 10. Tạo báo cáo
         return await meterReadingRepository.create(created_by, {
@@ -205,10 +215,9 @@ export const meterReadingService = {
           reading_date: input.readingDate,
           old_value: oldValue,
           new_value: newValue,
-          consumption,
           image_url: input.imageUrl,
-          period_month: month,
-          period_year: year,
+          period_month: periodMonth,
+          period_year: periodYear,
           status: "PENDING",
         });
       }

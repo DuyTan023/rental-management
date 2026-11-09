@@ -37,11 +37,27 @@ export async function POST(req: Request) {
       return apiErrorResponse("Nghiệp vụ không hợp lệ!", 400);
     }
 
-    const readingDate = new Date(body.readingDate);
+    // const readingDate = new Date(body.readingDate);
 
-    if (Number.isNaN(readingDate.getTime())) {
-      return apiErrorResponse("Ngày ghi nhận không hợp lệ!", 400);
-    }
+    // if (Number.isNaN(readingDate.getTime())) {
+    //   return apiErrorResponse("Ngày ghi nhận không hợp lệ!", 400);
+    // }
+
+    if (
+        typeof body.readingDate !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(body.readingDate)
+      ) {
+        return apiErrorResponse("Ngày ghi nhận không hợp lệ!", 400);
+      }
+
+      const readingDate = new Date(`${body.readingDate}T00:00:00.000Z`);
+
+      if (
+        Number.isNaN(readingDate.getTime()) ||
+        readingDate.toISOString().slice(0, 10) !== body.readingDate
+      ) {
+        return apiErrorResponse("Ngày ghi nhận không hợp lệ!", 400);
+      }
 
     const roomId = parseId(body.roomId);
 
@@ -148,12 +164,27 @@ export async function POST(req: Request) {
         return apiErrorResponse("Ảnh chỉ số là bắt buộc!", 400);
       }
 
-      input = {
+      const periodMonth = Number(body.periodMonth);
+      const periodYear = Number(body.periodYear);
+
+      if (
+        !Number.isInteger(periodMonth) ||
+        periodMonth < 1 ||
+        periodMonth > 12 ||
+        !Number.isInteger(periodYear) ||
+        periodYear < 2000
+      ) {
+        return apiErrorResponse("Kỳ báo cáo không hợp lệ!", 400);
+      }
+
+        input = {
         type: "MONTHLY_REPORT",
         roomId,
         serviceId,
         meterType: body.meterType,
         readingDate,
+        periodMonth,
+        periodYear,
         newValue,
         imageUrl: body.imageUrl,
       };
