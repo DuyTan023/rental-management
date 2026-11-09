@@ -42,12 +42,12 @@ export const tenantPaymentHistoryRepository = {
     return {
       invoices: {
         rental_contracts: {
-        //   contract_tenants: {
-        //     some: {
-        //       profile_id: profileId,
-        //       status: "ACTIVE",
-        //     },
-        //   },
+          contract_tenants: {
+            some: {
+              profile_id: profileId,
+              status: "ACTIVE",
+            },
+          },
         },
       },
 

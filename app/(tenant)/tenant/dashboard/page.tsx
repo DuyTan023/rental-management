@@ -82,11 +82,11 @@ const menuGroups = [
     description: "Gửi thông tin và các yêu cầu đến chủ trọ.",
     items: [
       {
-        title: "Chỉ số điện",
+        title: "Chỉ số điện nước",
         description: "Khai báo chỉ số điện sử dụng.",
         icon: Zap,
         color: "amber",
-        href: "/tenant/reports/electricity",
+        href: "/tenant/reports/meter-readings",
       },
       {
         title: "Chỉ số nước",

@@ -124,11 +124,25 @@ export const meterReadingService = {
         if (!contractTenant) throw new Error("NOT_CONTRACT_TENANT");
 
         // 5. Kiểm tra thời gian gửi: ngày 1 - 3
+        // const now = new Date();
+
+        // if (now.getDate() < 1 || now.getDate() > 3) {
+        //   throw new Error("SUBMISSION_PERIOD_CLOSED");
+        // }
+
+        const isTestMode =
+          process.env.METER_READING_TEST_MODE === "true";
+
         const now = new Date();
 
-        if (now.getDate() < 1 || now.getDate() > 3) {
+        if (
+          !isTestMode &&
+          (now.getDate() < 1 || now.getDate() > 3)
+        ) {
           throw new Error("SUBMISSION_PERIOD_CLOSED");
         }
+
+
 
         const month = now.getMonth() + 1;
         const year = now.getFullYear();
@@ -503,7 +517,7 @@ export const meterReadingService = {
 
     updateStatus: async (
     id: bigint,
-    status: "APPROVED" | "REJECTED",
+    status: "APPROVED" | "REJECTED" | "WITHDRAWN",
     note?: string
   ) => {
     try {

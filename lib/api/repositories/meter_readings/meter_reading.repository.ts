@@ -303,7 +303,7 @@
 
     updatePendingStatus: async (
       id: bigint,
-      status: "APPROVED" | "REJECTED",
+      status: "APPROVED" | "REJECTED" | "WITHDRAWN",
       note?: string
     ) => {
       return prisma.meter_readings.updateMany({

@@ -15,6 +15,8 @@ import {
   Wallet,
   Upload,
   X,
+  House,
+  ChevronRight,
 } from "lucide-react";
 import { CldUploadWidget } from "next-cloudinary";
 
@@ -30,6 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import Link from "next/link";
 
 // ======================================================
 // TYPES
@@ -430,7 +433,14 @@ export default function TenantPaymentsPage() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-10">
       {/* HEADER */}
-      <div>
+      <div className="mt-5">
+
+      <div className="flex items-center gap-2 text-sm text-slate-500">
+          <House size={16} />
+          <Link href = "/tenant/dashboard" className="hover:underline hover:text-blue-600"><span>Xóm Cũ</span></Link>
+          <ChevronRight size={14} />
+        <span className="text-blue-600">Thanh toán</span>
+      </div>
         <h1 className="text-2xl font-bold tracking-tight">
           Thanh toán hóa đơn
         </h1>

@@ -99,7 +99,7 @@ interface RouteParams {
 }
 
 type UpdateStatusBody = {
-  status: "APPROVED" | "REJECTED";
+  status: "APPROVED" | "REJECTED" | "WITHDRAWN";
   note?: string;
 };
 

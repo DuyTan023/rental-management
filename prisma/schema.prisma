@@ -384,6 +384,7 @@ enum meter_reading_status {
   PENDING
   APPROVED
   REJECTED
+  WITHDRAWN
 }
 
 enum invoice_status {

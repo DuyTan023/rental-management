@@ -10,6 +10,7 @@ import {
   Clock3,
   CreditCard,
   FileText,
+  House,
   Image as ImageIcon,
   RefreshCw,
   Wallet,
@@ -181,10 +182,16 @@ export default function TenantPaymentHistoryPage() {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-10">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        <div className="mt-5">
+             <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <House size={16} />
+                    <Link href = "/tenant/dashboard" className="hover:underline hover:text-blue-600"><span>Xóm Cũ</span></Link>
+                    <ChevronRight size={14} />
+                  <span className="text-blue-600">Lịch sử thanh toán</span>
+                </div>
           <h1 className="text-2xl font-bold tracking-tight">
             Lịch sử thanh toán
           </h1>
