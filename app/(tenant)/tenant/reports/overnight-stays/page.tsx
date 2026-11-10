@@ -792,17 +792,14 @@ export default function TenantOvernightStaysPage() {
   // Change status filter
   // ==================================================
 
-  function handleStatusFilterChange(value: string) {
-    if (
-      value !== "ALL" &&
-      !isNotificationStatus(value)
-    ) {
-      return;
-    }
 
-    setPage(1);
-    setStatusFilter(value as StatusFilter);
-  }
+
+  function handleStatusFilterChange(value: StatusFilter | null) {
+  if (value === null) return;
+
+  setPage(1);
+  setStatusFilter(value);
+}
 
   // ==================================================
   // Render

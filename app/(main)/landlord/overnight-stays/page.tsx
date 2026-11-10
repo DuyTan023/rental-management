@@ -610,19 +610,12 @@ export default function LandlordOvernightStaysPage() {
   // Filter
   // ==================================================
 
-  function handleStatusChange(value: string) {
-    if (
-      value !== "ALL" &&
-      value !== "PENDING" &&
-      value !== "COMPLETED" &&
-      value !== "CANCELLED"
-    ) {
-      return;
-    }
+function handleStatusChange(value: StatusFilter | null) {
+  if (value === null) return;
 
-    setPage(1);
-    setStatusFilter(value as StatusFilter);
-  }
+  setPage(1);
+  setStatusFilter(value);
+}
 
   // ==================================================
   // Render
