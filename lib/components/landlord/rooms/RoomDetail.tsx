@@ -10,6 +10,7 @@ import {
   Droplet,
   FileText,
   Maximize2,
+  Package,
   Pencil,
   UserRound,
   Users,
@@ -165,18 +166,31 @@ export default function RoomDetail({ room, currentReadings, }: RoomDetailProps) 
             </div>
           </div>
 
-          <FormUpdateRoom
-            room={room}
-            trigger={
-              <Button
-                size="sm"
-                className="h-8 border border-blue-500/20 bg-gradient-to-r from-blue-700 to-indigo-700 text-xs font-semibold text-white shadow-md shadow-blue-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-800 hover:to-indigo-800 hover:shadow-lg hover:shadow-blue-900/30"
-              >
-                <Pencil className="mr-1.5 size-3.5" />
-                Cập nhật thông tin phòng
-              </Button>
-            }
-          />
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href={`/landlord/rooms/${room.id}/assets`}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+          >
+            <Package className="h-4 w-4" />
+            Quản lý tài sản
+          </Button>
+        </Link>
+
+        <FormUpdateRoom
+          room={room}
+          trigger={
+            <Button
+              size="sm"
+              className="h-8 border border-blue-500/20 bg-gradient-to-r from-blue-700 to-indigo-700 text-xs font-semibold text-white shadow-md shadow-blue-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-800 hover:to-indigo-800 hover:shadow-lg hover:shadow-blue-900/30"
+            >
+              <Pencil className="mr-1.5 size-3.5" />
+              Cập nhật thông tin phòng
+            </Button>
+          }
+        />
+      </div>
         </div>
 
         {/* ROOM SUMMARY */}

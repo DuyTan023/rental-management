@@ -22,21 +22,24 @@ model password_reset_otps {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model users {
-  id                   BigInt                 @id @default(autoincrement())
-  email                String                 @unique @db.VarChar(255)
-  password_hash        String?                @db.VarChar(255)
-  role                 account_role
-  status               account_status         @default(INACTIVE)
-  activated_at         DateTime?              @db.Timestamptz(6)
-  last_login_at        DateTime?              @db.Timestamptz(6)
-  created_at           DateTime               @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime               @default(now()) @db.Timestamptz(6)
-  deposit_transactions deposit_transactions[]
-  invitations          invitations[]
-  meter_readings       meter_readings[]
-  password_reset_otps  password_reset_otps[]
-  payments             payments[]
-  profiles             profiles?
+  id                     BigInt                   @id @default(autoincrement())
+  email                  String                   @unique @db.VarChar(255)
+  password_hash          String?                  @db.VarChar(255)
+  role                   account_role
+  status                 account_status           @default(INACTIVE)
+  activated_at           DateTime?                @db.Timestamptz(6)
+  last_login_at          DateTime?                @db.Timestamptz(6)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  asset_incident_updates asset_incident_updates[]
+  asset_incidents        asset_incidents[]
+  deposit_transactions   deposit_transactions[]
+  invitations            invitations[]
+  meter_readings         meter_readings[]
+  overnight_stays        overnight_stays[]
+  password_reset_otps    password_reset_otps[]
+  payments               payments[]
+  profiles               profiles?
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -54,6 +57,7 @@ model profiles {
   created_at       DateTime           @default(now()) @db.Timestamptz(6)
   updated_at       DateTime           @default(now()) @db.Timestamptz(6)
   contract_tenants contract_tenants[]
+  overnight_stays  overnight_stays[]
   payments         payments[]
   users            users?             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
@@ -70,8 +74,10 @@ model rooms {
   description      String?
   created_at       DateTime           @default(now()) @db.Timestamptz(6)
   updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  asset_incidents  asset_incidents[]
   meter_readings   meter_readings[]
   rental_contracts rental_contracts[]
+  room_assets      room_assets[]
   room_services    room_services[]
 }
 
@@ -137,11 +143,13 @@ model rental_contracts {
   note                       String?
   created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
   updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  asset_incidents            asset_incidents[]
   contract_deposits          contract_deposits[]
   contract_price_adjustments contract_price_adjustments[]
   contract_tenants           contract_tenants[]
   invoices                   invoices[]
   meter_readings             meter_readings[]
+  overnight_stays            overnight_stays[]
   rooms                      rooms                        @relation(fields: [room_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
@@ -304,6 +312,95 @@ model payments {
   profiles         profiles?      @relation(fields: [payer_profile_id], references: [id], onUpdate: NoAction)
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model overnight_stays {
+  id                    BigInt              @id @default(autoincrement())
+  contract_id           BigInt
+  tenant_profile_id     BigInt
+  guest_name            String              @db.VarChar(255)
+  guest_identity_number String?             @db.VarChar(50)
+  guest_phone           String?             @db.VarChar(20)
+  guest_address         String?
+  check_in_at           DateTime            @db.Timestamptz(6)
+  check_out_at          DateTime            @db.Timestamptz(6)
+  actual_check_out_at   DateTime?           @db.Timestamptz(6)
+  notification_status   notification_status @default(PENDING)
+  notified_by           BigInt?
+  notification_at       DateTime?           @db.Timestamptz(6)
+  note                  String?
+  created_at            DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime            @default(now()) @db.Timestamptz(6)
+  rental_contracts      rental_contracts    @relation(fields: [contract_id], references: [id], onUpdate: NoAction, map: "fk_overnight_contract")
+  users                 users?              @relation(fields: [notified_by], references: [id], onUpdate: NoAction, map: "fk_overnight_notified_by")
+  profiles              profiles            @relation(fields: [tenant_profile_id], references: [id], onUpdate: NoAction, map: "fk_overnight_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model asset_incident_updates {
+  id              BigInt           @id @default(autoincrement())
+  incident_id     BigInt
+  updated_by      BigInt
+  old_status      incident_status?
+  new_status      incident_status
+  note            String?
+  image_urls      String[]         @default([])
+  created_at      DateTime         @default(now()) @db.Timestamptz(6)
+  asset_incidents asset_incidents  @relation(fields: [incident_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_asset_incident_updates_incident")
+  users           users            @relation(fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_asset_incident_updates_user")
+
+  @@index([incident_id, created_at], map: "idx_asset_incident_updates_incident_created")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model asset_incidents {
+  id                     BigInt                   @id @default(autoincrement())
+  asset_id               BigInt?
+  room_id                BigInt
+  contract_id            BigInt
+  reported_by            BigInt
+  title                  String                   @db.VarChar(255)
+  description            String
+  image_urls             String[]                 @default([])
+  priority               incident_priority        @default(MEDIUM)
+  status                 incident_status          @default(PENDING)
+  resolution_note        String?
+  resolved_at            DateTime?                @db.Timestamptz(6)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  asset_incident_updates asset_incident_updates[]
+  room_assets            room_assets?             @relation(fields: [asset_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_asset_incidents_asset")
+  rental_contracts       rental_contracts         @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_asset_incidents_contract")
+  users                  users                    @relation(fields: [reported_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_asset_incidents_reporter")
+  rooms                  rooms                    @relation(fields: [room_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_asset_incidents_room")
+
+  @@index([contract_id], map: "idx_asset_incidents_contract")
+  @@index([reported_by], map: "idx_asset_incidents_reported_by")
+  @@index([room_id, status], map: "idx_asset_incidents_room_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model room_assets {
+  id              BigInt            @id @default(autoincrement())
+  room_id         BigInt
+  name            String            @db.VarChar(255)
+  description     String?
+  quantity        Int               @default(1)
+  condition       asset_condition   @default(GOOD)
+  purchase_date   DateTime?         @db.Date
+  unit_price      Decimal?          @db.Decimal(15, 2)
+  image_url       String?
+  note            String?
+  is_active       Boolean           @default(true)
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+  asset_incidents asset_incidents[]
+  rooms           rooms             @relation(fields: [room_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_room_assets_room")
+
+  @@index([room_id], map: "idx_room_assets_room_id")
+}
+
 enum account_role {
   LANDLORD
   TENANT
@@ -407,4 +504,32 @@ enum payment_status {
   FAILED
   CANCELLED
   REFUNDED
+}
+
+enum notification_status {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum asset_condition {
+  GOOD
+  DAMAGED
+  UNDER_REPAIR
+  BROKEN
+}
+
+enum incident_priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum incident_status {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+  CANCELLED
 }

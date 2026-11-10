@@ -20,6 +20,7 @@ import {
   Building2,
   Wallet,
   ShieldCheck,
+  ShelvingUnit,
 } from "lucide-react";
 
 const menuGroups = [
@@ -47,6 +48,13 @@ const menuGroups = [
         icon: Users,
         color: "cyan",
         href: "/tenant/roommates",
+      },
+      {
+        title: "Tài sản phòng thuê",
+        description: "Xem thông tin tài sản thuộc phòng thuê.",
+        icon: ShelvingUnit,
+        color: "orange",
+        href: "/tenant/assets",
       },
     ],
   },
@@ -89,25 +97,18 @@ const menuGroups = [
         href: "/tenant/reports/meter-readings",
       },
       {
-        title: "Chỉ số nước",
-        description: "Khai báo chỉ số nước sử dụng.",
-        icon: Droplets,
-        color: "sky",
-        href: "/tenant/reports/water",
-      },
-      {
         title: "Lưu trú qua đêm",
         description: "Khai báo người thân hoặc khách ở qua đêm.",
         icon: Moon,
         color: "violet",
-        href: "/tenant/reports/overnight",
+        href: "/tenant/reports/overnight-stays",
       },
       {
         title: "Hư hỏng tài sản",
         description: "Báo cáo thiết bị hoặc tài sản bị hư hỏng.",
         icon: Wrench,
         color: "rose",
-        href: "/tenant/reports/damage",
+        href: "/tenant/reports/incidents",
       },
     ],
   },

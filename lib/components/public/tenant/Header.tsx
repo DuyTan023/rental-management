@@ -7,8 +7,10 @@ import {
   LogOut,
   UserRound,
   ChevronDown,
+  User,
 } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
 
 type HeaderProps = {
   email?: string | null;
@@ -100,6 +102,15 @@ export default function Header({ email }: HeaderProps) {
                     {email || "Tài khoản"}
                   </p>
                 </div>
+
+                <Link
+                    href="/tenant/profiles"
+                    onClick={() => setOpenMenu(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-blue-50 hover:text-blue-600"
+                  >
+                    <User size={18} />
+                    <span>Thông tin cá nhân</span>
+                </Link>
 
                 <button
                   type="button"
