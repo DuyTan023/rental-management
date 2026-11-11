@@ -112,40 +112,40 @@ const menuGroups = [
       },
     ],
   },
-  {
-    title: "TÀI KHOẢN VÀ HỖ TRỢ",
-    description: "Quản lý tài khoản và liên hệ với chủ trọ.",
-    items: [
-      {
-        title: "Thông tin cá nhân",
-        description: "Xem và cập nhật thông tin hồ sơ.",
-        icon: UserRound,
-        color: "blue",
-        href: "/tenant/profile",
-      },
-      {
-        title: "Đổi mật khẩu",
-        description: "Thay đổi mật khẩu đăng nhập.",
-        icon: KeyRound,
-        color: "orange",
-        href: "/tenant/change-password",
-      },
-      {
-        title: "Thông báo",
-        description: "Theo dõi thông báo từ hệ thống và chủ trọ.",
-        icon: Bell,
-        color: "amber",
-        href: "/tenant/notifications",
-      },
-      {
-        title: "Yêu cầu hỗ trợ",
-        description: "Gửi thắc mắc hoặc yêu cầu đến chủ trọ.",
-        icon: MessageSquareText,
-        color: "emerald",
-        href: "/tenant/support",
-      },
-    ],
-  },
+  // {
+  //   title: "TÀI KHOẢN VÀ HỖ TRỢ",
+  //   description: "Quản lý tài khoản và liên hệ với chủ trọ.",
+  //   items: [
+  //     {
+  //       title: "Thông tin cá nhân",
+  //       description: "Xem và cập nhật thông tin hồ sơ.",
+  //       icon: UserRound,
+  //       color: "blue",
+  //       href: "/tenant/profile",
+  //     },
+  //     {
+  //       title: "Đổi mật khẩu",
+  //       description: "Thay đổi mật khẩu đăng nhập.",
+  //       icon: KeyRound,
+  //       color: "orange",
+  //       href: "/tenant/change-password",
+  //     },
+  //     {
+  //       title: "Thông báo",
+  //       description: "Theo dõi thông báo từ hệ thống và chủ trọ.",
+  //       icon: Bell,
+  //       color: "amber",
+  //       href: "/tenant/notifications",
+  //     },
+  //     {
+  //       title: "Yêu cầu hỗ trợ",
+  //       description: "Gửi thắc mắc hoặc yêu cầu đến chủ trọ.",
+  //       icon: MessageSquareText,
+  //       color: "emerald",
+  //       href: "/tenant/support",
+  //     },
+  //   ],
+  // },
 ];
 
 const colorStyles: Record<string, string> = {

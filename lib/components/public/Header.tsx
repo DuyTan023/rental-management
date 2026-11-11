@@ -58,7 +58,9 @@ export default function Header() {
     { name: "Đổi mật khẩu", href: "/tenant/change-password" },
     { name: "Thông báo", href: "/tenant/notifications" },
     { name: "Yêu cầu hỗ trợ", href: "/tenant/support" },
-    { name: "Lưu trú qua đêm", href: "/landlord/overnight-stays"},
+    { name: "Lưu trú qua đêm", href: "/landlord/overnight-stays" },
+    { name: "Quản lý tài sản", href: "/landlord/incidents" },
+    { name: "Tài khoản thanh toán", href: "/landlord/payment-accounts"},
   ];
 
   const currentMenu = menuItems.find(
