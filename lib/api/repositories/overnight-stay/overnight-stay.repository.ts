@@ -296,15 +296,47 @@ export const overnightStayRepository = {
   // TENANT - LIST
   // ==========================================
 
+  // findManyByTenant(
+  //   profileId: bigint,
+  //   skip: number,
+  //   take: number,
+  //   status?: NotificationStatus
+  // ) {
+  //   return prisma.overnight_stays.findMany({
+  //     where: {
+  //       tenant_profile_id: profileId,
+  //       ...(status ? { notification_status: status } : {}),
+  //     },
+  //     include: tenantInclude,
+  //     orderBy: [
+  //       {
+  //         created_at: "desc",
+  //       },
+  //       {
+  //         id: "desc",
+  //       },
+  //     ],
+  //     skip,
+  //     take,
+  //   });
+  // },
+
+
   findManyByTenant(
-    profileId: bigint,
+    roomIds: bigint[],
     skip: number,
     take: number,
     status?: NotificationStatus
   ) {
     return prisma.overnight_stays.findMany({
       where: {
-        tenant_profile_id: profileId,
+        rental_contracts: {
+          is: {
+            room_id: {
+              in: roomIds,
+            },
+          },
+        },
         ...(status ? { notification_status: status } : {}),
       },
       include: tenantInclude,
@@ -321,24 +353,89 @@ export const overnightStayRepository = {
     });
   },
 
+  // countByTenant(
+  //   profileId: bigint,
+  //   status?: NotificationStatus
+  // ) {
+  //   return prisma.overnight_stays.count({
+  //     where: {
+  //       tenant_profile_id: profileId,
+  //       ...(status ? { notification_status: status } : {}),
+  //     },
+  //   });
+  // },
+
   countByTenant(
-    profileId: bigint,
+    roomIds: bigint[],
     status?: NotificationStatus
   ) {
     return prisma.overnight_stays.count({
       where: {
-        tenant_profile_id: profileId,
+        rental_contracts: {
+          is: {
+            room_id: {
+              in: roomIds,
+            },
+          },
+        },
         ...(status ? { notification_status: status } : {}),
       },
     });
   },
 
   // Thống kê toàn bộ lịch sử, không phụ thuộc bộ lọc
-  async getTenantStatistics(profileId: bigint) {
+  // async getTenantStatistics(profileId: bigint) {
+  //   const grouped = await prisma.overnight_stays.groupBy({
+  //     by: ["notification_status"],
+  //     where: {
+  //       tenant_profile_id: profileId,
+  //     },
+  //     _count: {
+  //       _all: true,
+  //     },
+  //   });
+
+  //   const statistics = {
+  //     total: 0,
+  //     pending: 0,
+  //     completed: 0,
+  //     cancelled: 0,
+  //   };
+
+  //   for (const item of grouped) {
+  //     const count = item._count._all;
+
+  //     statistics.total += count;
+
+  //     switch (item.notification_status) {
+  //       case "PENDING":
+  //         statistics.pending = count;
+  //         break;
+
+  //       case "COMPLETED":
+  //         statistics.completed = count;
+  //         break;
+
+  //       case "CANCELLED":
+  //         statistics.cancelled = count;
+  //         break;
+  //     }
+  //   }
+
+  //   return statistics;
+  // },
+
+  async getTenantStatistics(roomIds: bigint[]) {
     const grouped = await prisma.overnight_stays.groupBy({
       by: ["notification_status"],
       where: {
-        tenant_profile_id: profileId,
+        rental_contracts: {
+          is: {
+            room_id: {
+              in: roomIds,
+            },
+          },
+        },
       },
       _count: {
         _all: true,
@@ -379,11 +476,27 @@ export const overnightStayRepository = {
   // TENANT - DETAIL
   // ==========================================
 
-  findByTenantId(id: bigint, profileId: bigint) {
+  // findByTenantId(id: bigint, profileId: bigint) {
+  //   return prisma.overnight_stays.findFirst({
+  //     where: {
+  //       id,
+  //       tenant_profile_id: profileId,
+  //     },
+  //     include: tenantInclude,
+  //   });
+  // },
+
+  findByRoomIds(id: bigint, roomIds: bigint[]) {
     return prisma.overnight_stays.findFirst({
       where: {
         id,
-        tenant_profile_id: profileId,
+        rental_contracts: {
+          is: {
+            room_id: {
+              in: roomIds,
+            },
+          },
+        },
       },
       include: tenantInclude,
     });
@@ -567,6 +680,28 @@ export const overnightStayRepository = {
         id,
       },
       include: landlordInclude,
+    });
+  },
+
+  findActiveTenantRoomIds(profileId: bigint) {
+    return prisma.contract_tenants.findMany({
+      where: {
+        profile_id: profileId,
+        status: "ACTIVE",
+        left_at: null,
+        rental_contracts: {
+          is: {
+            status: "ACTIVE",
+          },
+        },
+      },
+      select: {
+        rental_contracts: {
+          select: {
+            room_id: true,
+          },
+        },
+      },
     });
   },
 };

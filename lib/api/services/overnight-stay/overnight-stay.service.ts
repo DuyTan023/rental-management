@@ -156,87 +156,233 @@ export const overnightStayService = {
   },
 
   // Danh sách thông báo của người thuê
+  // async getMyList(
+  //   userId: bigint,
+  //   page = 1,
+  //   limit = 10,
+  //   rawStatus?: string
+  // ) {
+  //   validatePagination(page, limit);
+
+  //   const status = validateStatus(rawStatus);
+
+  //   const profile =
+  //     await overnightStayRepository.findProfileByUserId(userId);
+
+  //   if (!profile) {
+  //     throw new OvernightStayError(
+  //       "Không tìm thấy hồ sơ người thuê",
+  //       404
+  //     );
+  //   }
+
+  //   const skip = (page - 1) * limit;
+
+  //   const [data, total, statistics] = await Promise.all([
+  //     overnightStayRepository.findManyByTenant(
+  //       profile.id,
+  //       skip,
+  //       limit,
+  //       status
+  //     ),
+
+  //     overnightStayRepository.countByTenant(
+  //       profile.id,
+  //       status
+  //     ),
+
+  //     overnightStayRepository.getTenantStatistics(
+  //       profile.id
+  //     ),
+  //   ]);
+
+  //   return {
+  //     data,
+  //     pagination: {
+  //       page,
+  //       limit,
+  //       total,
+  //       totalPages: Math.ceil(total / limit),
+  //     },
+  //     statistics,
+  //   };
+  // },
+
   async getMyList(
-    userId: bigint,
-    page = 1,
-    limit = 10,
-    rawStatus?: string
-  ) {
-    validatePagination(page, limit);
+  userId: bigint,
+  page = 1,
+  limit = 10,
+  rawStatus?: string
+) {
+  validatePagination(page, limit);
 
-    const status = validateStatus(rawStatus);
+  if (userId <= 0) {
+    throw new OvernightStayError(
+      "Tài khoản không hợp lệ",
+      401
+    );
+  }
 
-    const profile =
-      await overnightStayRepository.findProfileByUserId(userId);
+  const status = validateStatus(rawStatus);
 
-    if (!profile) {
-      throw new OvernightStayError(
-        "Không tìm thấy hồ sơ người thuê",
-        404
-      );
-    }
+  const profile =
+    await overnightStayRepository.findProfileByUserId(userId);
 
-    const skip = (page - 1) * limit;
+  if (!profile) {
+    throw new OvernightStayError(
+      "Không tìm thấy hồ sơ người thuê",
+      404
+    );
+  }
 
-    const [data, total, statistics] = await Promise.all([
-      overnightStayRepository.findManyByTenant(
-        profile.id,
-        skip,
-        limit,
-        status
-      ),
+  const contracts =
+    await overnightStayRepository.findActiveTenantRoomIds(
+      profile.id
+    );
 
-      overnightStayRepository.countByTenant(
-        profile.id,
-        status
-      ),
+  const roomIds = [
+    ...new Set(
+      contracts.map(
+        (item) => item.rental_contracts.room_id
+      )
+    ),
+  ];
 
-      overnightStayRepository.getTenantStatistics(
-        profile.id
-      ),
-    ]);
-
+  if (roomIds.length === 0) {
     return {
-      data,
+      data: [],
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: 0,
+        totalPages: 0,
       },
-      statistics,
+      statistics: {
+        total: 0,
+        pending: 0,
+        completed: 0,
+        cancelled: 0,
+      },
     };
-  },
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [data, total, statistics] = await Promise.all([
+    overnightStayRepository.findManyByTenant(
+      roomIds,
+      skip,
+      limit,
+      status
+    ),
+
+    overnightStayRepository.countByTenant(
+      roomIds,
+      status
+    ),
+
+    overnightStayRepository.getTenantStatistics(
+      roomIds
+    ),
+  ]);
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+    statistics,
+  };
+},
 
   // Chi tiết thông báo của người thuê
+  // async getMyDetail(userId: bigint, id: bigint) {
+  //   validateId(id);
+
+  //   const profile =
+  //     await overnightStayRepository.findProfileByUserId(userId);
+
+  //   if (!profile) {
+  //     throw new OvernightStayError(
+  //       "Không tìm thấy hồ sơ người thuê",
+  //       404
+  //     );
+  //   }
+
+  //   const record =
+  //     await overnightStayRepository.findByTenantId(
+  //       id,
+  //       profile.id
+  //     );
+
+  //   if (!record) {
+  //     throw new OvernightStayError(
+  //       "Không tìm thấy thông báo lưu trú",
+  //       404
+  //     );
+  //   }
+
+  //   return record;
+  // },
+
   async getMyDetail(userId: bigint, id: bigint) {
-    validateId(id);
+  validateId(id);
 
-    const profile =
-      await overnightStayRepository.findProfileByUserId(userId);
+  if (userId <= 0) {
+    throw new OvernightStayError(
+      "Tài khoản không hợp lệ",
+      401
+    );
+  }
 
-    if (!profile) {
-      throw new OvernightStayError(
-        "Không tìm thấy hồ sơ người thuê",
-        404
-      );
-    }
+  const profile =
+    await overnightStayRepository.findProfileByUserId(userId);
 
-    const record =
-      await overnightStayRepository.findByTenantId(
-        id,
-        profile.id
-      );
+  if (!profile) {
+    throw new OvernightStayError(
+      "Không tìm thấy hồ sơ người thuê",
+      404
+    );
+  }
 
-    if (!record) {
-      throw new OvernightStayError(
-        "Không tìm thấy thông báo lưu trú",
-        404
-      );
-    }
+  const contracts =
+    await overnightStayRepository.findActiveTenantRoomIds(
+      profile.id
+    );
 
-    return record;
-  },
+  const roomIds = [
+    ...new Set(
+      contracts.map(
+        (item) => item.rental_contracts.room_id
+      )
+    ),
+  ];
+
+  if (roomIds.length === 0) {
+    throw new OvernightStayError(
+      "Không tìm thấy thông báo lưu trú",
+      404
+    );
+  }
+
+  const record =
+    await overnightStayRepository.findByRoomIds(
+      id,
+      roomIds
+    );
+
+  if (!record) {
+    throw new OvernightStayError(
+      "Không tìm thấy thông báo lưu trú",
+      404
+    );
+  }
+
+  return record;
+},
 
   // Chỉnh sửa thông báo
   async update(
@@ -248,6 +394,15 @@ export const overnightStayService = {
     validateOvernightStayInput(input);
 
     const record = await this.getMyDetail(userId, id);
+    const profile =
+      await overnightStayRepository.findProfileByUserId(userId);
+
+    if (!profile || record.tenant_profile_id !== profile.id) {
+      throw new OvernightStayError(
+        "Bạn không có quyền chỉnh sửa thông báo này",
+        403
+      );
+    }
 
     if (record.notification_status !== "PENDING") {
       throw new OvernightStayError(
@@ -308,6 +463,16 @@ export const overnightStayService = {
     validateId(id);
 
     const record = await this.getMyDetail(userId, id);
+
+    const profile =
+      await overnightStayRepository.findProfileByUserId(userId);
+
+    if (!profile || record.tenant_profile_id !== profile.id) {
+      throw new OvernightStayError(
+        "Bạn không có quyền hủy thông báo này",
+        403
+      );
+    }
 
     if (record.notification_status !== "PENDING") {
       throw new OvernightStayError(

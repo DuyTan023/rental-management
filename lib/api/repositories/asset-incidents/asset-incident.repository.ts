@@ -134,14 +134,51 @@ export const assetIncidentRepository = {
     });
   },
 
+  // findTenantIncidents(
+  //   userId: bigint,
+  //   skip: number,
+  //   take: number
+  // ) {
+  //   return prisma.$transaction(async (tx) => {
+  //     const where: Prisma.asset_incidentsWhereInput = {
+  //       reported_by: userId,
+  //     };
+
+  //     const [items, total] = await Promise.all([
+  //       tx.asset_incidents.findMany({
+  //         where,
+  //         include: incidentInclude,
+  //         orderBy: {
+  //           created_at: "desc",
+  //         },
+  //         skip,
+  //         take,
+  //       }),
+  //       tx.asset_incidents.count({ where }),
+  //     ]);
+
+  //     return {
+  //       items,
+  //       pagination: {
+  //         total,
+  //         page: Math.floor(skip / take) + 1,
+  //         limit: take,
+  //         totalPages: Math.ceil(total / take),
+  //       },
+  //     };
+  //   });
+  // },
+
   findTenantIncidents(
-    userId: bigint,
+    roomIds: bigint[],
     skip: number,
     take: number
   ) {
     return prisma.$transaction(async (tx) => {
       const where: Prisma.asset_incidentsWhereInput = {
-        reported_by: userId,
+        room_id: {
+          in: roomIds,
+        },
       };
 
       const [items, total] = await Promise.all([
@@ -154,6 +191,7 @@ export const assetIncidentRepository = {
           skip,
           take,
         }),
+
         tx.asset_incidents.count({ where }),
       ]);
 
@@ -255,6 +293,32 @@ export const assetIncidentRepository = {
         },
         include: incidentInclude,
       });
+    });
+  },
+
+  findActiveTenantRoomIds(userId: bigint) {
+    return prisma.contract_tenants.findMany({
+      where: {
+        status: "ACTIVE",
+        left_at: null,
+        profiles: {
+          is: {
+            user_id: userId,
+          },
+        },
+        rental_contracts: {
+          is: {
+            status: "ACTIVE",
+          },
+        },
+      },
+      select: {
+        rental_contracts: {
+          select: {
+            room_id: true,
+          },
+        },
+      },
     });
   },
 };

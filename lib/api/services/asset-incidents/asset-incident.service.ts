@@ -229,6 +229,23 @@ export const assetIncidentService = {
     return assetIncidentRepository.create(data, userId);
   },
 
+  // async getTenantIncidents(
+  //   user: AuthUser,
+  //   page = 1,
+  //   limit = 10
+  // ) {
+  //   authorize(user, "TENANT");
+  //   validatePagination(page, limit);
+
+  //   const skip = (page - 1) * limit;
+
+  //   return assetIncidentRepository.findTenantIncidents(
+  //     BigInt(user.id),
+  //     skip,
+  //     limit
+  //   );
+  // },
+
   async getTenantIncidents(
     user: AuthUser,
     page = 1,
@@ -237,10 +254,34 @@ export const assetIncidentService = {
     authorize(user, "TENANT");
     validatePagination(page, limit);
 
+    const userId = BigInt(user.id);
     const skip = (page - 1) * limit;
 
+    const contracts =
+      await assetIncidentRepository.findActiveTenantRoomIds(userId);
+
+    const roomIds = [
+      ...new Set(
+        contracts.map(
+          (item) => item.rental_contracts.room_id
+        )
+      ),
+    ];
+
+    if (roomIds.length === 0) {
+      return {
+        items: [],
+        pagination: {
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        },
+      };
+    }
+
     return assetIncidentRepository.findTenantIncidents(
-      BigInt(user.id),
+      roomIds,
       skip,
       limit
     );
@@ -278,29 +319,72 @@ export const assetIncidentService = {
     );
   },
 
+  // async getDetail(user: AuthUser, id: bigint) {
+  //   if (!user.id || !/^[1-9]\d*$/.test(user.id)) {
+  //     throw new AssetIncidentError("Vui lòng đăng nhập", 401);
+  //   }
+
+  //   if (user.role !== "LANDLORD" && user.role !== "TENANT") {
+  //     throw new AssetIncidentError("Bạn không có quyền xem báo cáo", 403);
+  //   }
+
+  //   const incident = await assetIncidentRepository.findById(id);
+
+  //   if (!incident) {
+  //     throw new AssetIncidentError("Không tìm thấy báo cáo sự cố", 404);
+  //   }
+
+  //   if (
+  //     user.role === "TENANT" &&
+  //     incident.reported_by !== BigInt(user.id)
+  //   ) {
+  //     throw new AssetIncidentError(
+  //       "Bạn không có quyền xem báo cáo này",
+  //       403
+  //     );
+  //   }
+
+  //   return incident;
+  // },
+
   async getDetail(user: AuthUser, id: bigint) {
     if (!user.id || !/^[1-9]\d*$/.test(user.id)) {
       throw new AssetIncidentError("Vui lòng đăng nhập", 401);
     }
 
     if (user.role !== "LANDLORD" && user.role !== "TENANT") {
-      throw new AssetIncidentError("Bạn không có quyền xem báo cáo", 403);
+      throw new AssetIncidentError(
+        "Bạn không có quyền xem báo cáo",
+        403
+      );
     }
 
     const incident = await assetIncidentRepository.findById(id);
 
     if (!incident) {
-      throw new AssetIncidentError("Không tìm thấy báo cáo sự cố", 404);
+      throw new AssetIncidentError(
+        "Không tìm thấy báo cáo sự cố",
+        404
+      );
     }
 
-    if (
-      user.role === "TENANT" &&
-      incident.reported_by !== BigInt(user.id)
-    ) {
-      throw new AssetIncidentError(
-        "Bạn không có quyền xem báo cáo này",
-        403
+    if (user.role === "TENANT") {
+      const contracts =
+        await assetIncidentRepository.findActiveTenantRoomIds(
+          BigInt(user.id)
+        );
+
+      const hasAccess = contracts.some(
+        (item) =>
+          item.rental_contracts.room_id === incident.room_id
       );
+
+      if (!hasAccess) {
+        throw new AssetIncidentError(
+          "Bạn không có quyền xem báo cáo này",
+          403
+        );
+      }
     }
 
     return incident;

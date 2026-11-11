@@ -143,7 +143,7 @@ export default function CreateTenantIncidentPage() {
         throw new Error(result.message || "Không thể gửi báo cáo.");
       }
 
-      router.push("/tenant/incidents");
+      router.push("/tenant/reports/incidents");
       router.refresh();
     } catch (err) {
       setError(
